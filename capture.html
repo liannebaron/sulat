@@ -1,0 +1,743 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sulat stroke capture</title>
+<style>
+  :root {
+    --page: #eceff3;
+    --card: #ffffff;
+    --ink: #14161a;
+    --quiet: #5d6572;
+    --line: #d9dde3;
+    --accent: #1f3a8a;
+    --done: #1f7a4d;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background: var(--page);
+    color: var(--ink);
+    font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    overscroll-behavior: none;
+  }
+  .wrap {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 16px;
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+  }
+  h1 { margin: 4px 0 2px; font: 400 30px Georgia, "Times New Roman", serif; }
+  .lede { margin: 0 0 16px; color: var(--quiet); }
+  .layout { display: grid; gap: 16px; grid-template-columns: 1fr; }
+  @media (min-width: 880px) { .layout { grid-template-columns: minmax(0, 720px) 1fr; } }
+  .stage, .panel {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px;
+  }
+  .stage-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 10px; }
+  #glyphName { font: 400 34px Georgia, "Times New Roman", serif; }
+  #glyphUni { font: 30px "Noto Sans Tagalog", "Segoe UI Historic", "Noto Sans", serif; color: var(--quiet); }
+  #hint { margin: 0 0 10px; color: var(--quiet); }
+  canvas#pad {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+  button {
+    font: inherit;
+    min-height: 48px;
+    padding: 0 18px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .toggles { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-top: 12px; color: var(--quiet); }
+  .toggles label { display: flex; align-items: center; gap: 8px; min-height: 36px; }
+  .toggles input { width: 20px; height: 20px; }
+  #status { min-height: 1.4em; margin: 10px 0 0; color: var(--quiet); }
+  h2 { margin: 0 0 4px; font-size: 17px; line-height: 1.3; }
+  .progress { margin: 0 0 12px; color: var(--quiet); }
+  .start { margin: 0 0 14px; padding: 10px 12px; border-radius: 10px; background: #f4f6fa; color: var(--ink); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 18px; }
+  .chip { min-height: 44px; min-width: 56px; padding: 0 12px; }
+  .chip.active { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+  .chip.done::after { content: " \2713"; color: var(--done); }
+  .export { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+  details { margin-top: 18px; color: var(--quiet); }
+  summary { cursor: pointer; min-height: 36px; display: flex; align-items: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Stroke capture</h1>
+  <p class="lede">Draw each glyph once, the way you’d write it. Stroke order and direction are recorded.</p>
+
+  <div class="layout">
+    <section class="stage" aria-label="Drawing area">
+      <div class="stage-head">
+        <span id="glyphName">ma</span>
+        <span id="glyphUni" aria-hidden="true"></span>
+      </div>
+      <p id="hint"></p>
+      <canvas id="pad" aria-label="Drawing canvas"></canvas>
+      <div class="controls">
+        <button id="undo" type="button">Undo stroke</button>
+        <button id="clear" type="button">Clear</button>
+        <button id="replay" type="button">Replay</button>
+        <button id="save" type="button" class="primary">Save and next</button>
+      </div>
+      <div class="toggles">
+        <label><input id="showOrder" type="checkbox" checked> Show stroke order</label>
+        <label><input id="allowFinger" type="checkbox" checked> Allow finger</label>
+      </div>
+      <p id="status" role="status" aria-live="polite"></p>
+    </section>
+
+    <aside class="panel" aria-label="Glyph list and export">
+      <h2>Glyphs</h2>
+      <p class="progress" id="progress"></p>
+      <p class="start">Start with ma, ha, la, ka and ta, then the i-mark (above) and the cross mark. That covers <em>mahal kita</em>.</p>
+      <div id="chips"></div>
+      <h2>Export</h2>
+      <div class="export">
+        <button id="exportJson" type="button" class="primary">Download JSON</button>
+        <button id="copyJson" type="button">Copy JSON</button>
+        <button id="exportPng" type="button">PNG of this glyph</button>
+      </div>
+      <details>
+        <summary>More</summary>
+        <button id="reset" type="button">Reset all saved glyphs</button>
+      </details>
+    </aside>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- pure helpers (kept together so they can be tested) ---------- */
+  // HELPERS-START
+  function r1(v) { return Math.round(v * 10) / 10; }
+
+  function perp(p, a, b) {
+    var dx = b.x - a.x, dy = b.y - a.y;
+    var len = Math.sqrt(dx * dx + dy * dy);
+    if (!len) { return Math.sqrt((p.x - a.x) * (p.x - a.x) + (p.y - a.y) * (p.y - a.y)); }
+    return Math.abs(dy * p.x - dx * p.y + b.x * a.y - b.y * a.x) / len;
+  }
+
+  // Ramer-Douglas-Peucker: drops points that sit within eps of a straight line.
+  function rdp(pts, eps) {
+    if (pts.length < 3) { return pts.slice(); }
+    var keep = [];
+    for (var k = 0; k < pts.length; k++) { keep.push(false); }
+    keep[0] = true;
+    keep[pts.length - 1] = true;
+    var stack = [[0, pts.length - 1]];
+    while (stack.length) {
+      var se = stack.pop(), s = se[0], e = se[1], md = 0, mi = -1;
+      for (var i = s + 1; i < e; i++) {
+        var d = perp(pts[i], pts[s], pts[e]);
+        if (d > md) { md = d; mi = i; }
+      }
+      if (mi > -1 && md > eps) {
+        keep[mi] = true;
+        stack.push([s, mi]);
+        stack.push([mi, e]);
+      }
+    }
+    return pts.filter(function (_, idx) { return keep[idx]; });
+  }
+
+  // Catmull-Rom through the points, written as cubic Beziers in SVG path syntax.
+  function smoothPath(pts) {
+    if (pts.length === 1) { return 'M' + r1(pts[0].x) + ' ' + r1(pts[0].y) + 'h0.01'; }
+    var d = 'M' + r1(pts[0].x) + ' ' + r1(pts[0].y);
+    if (pts.length === 2) { return d + 'L' + r1(pts[1].x) + ' ' + r1(pts[1].y); }
+    for (var i = 0; i < pts.length - 1; i++) {
+      var p0 = pts[i - 1] || pts[i];
+      var p1 = pts[i];
+      var p2 = pts[i + 1];
+      var p3 = pts[i + 2] || pts[i + 1];
+      var c1x = p1.x + (p2.x - p0.x) / 6, c1y = p1.y + (p2.y - p0.y) / 6;
+      var c2x = p2.x - (p3.x - p1.x) / 6, c2y = p2.y - (p3.y - p1.y) / 6;
+      d += 'C' + r1(c1x) + ' ' + r1(c1y) + ' ' + r1(c2x) + ' ' + r1(c2y) + ' ' + r1(p2.x) + ' ' + r1(p2.y);
+    }
+    return d;
+  }
+
+  // Turns a drawn stroke into the compact form stored in the JSON.
+  function compact(stroke) {
+    if (stroke.dot) {
+      var p = stroke.pts[0];
+      return { kind: 'dot', dur: 0, points: [[r1(p.x), r1(p.y), 0, Math.round(p.p * 100) / 100]], path: smoothPath([p]) };
+    }
+    var simple = rdp(stroke.pts, 1.6);
+    return {
+      kind: 'stroke',
+      dur: Math.round(stroke.dur),
+      points: simple.map(function (q) { return [r1(q.x), r1(q.y), Math.round(q.t), Math.round(q.p * 100) / 100]; }),
+      path: smoothPath(simple)
+    };
+  }
+
+  function expand(c) {
+    return {
+      dot: c.kind === 'dot',
+      dur: c.dur || 0,
+      pts: c.points.map(function (a) { return { x: a[0], y: a[1], t: a[2], p: a[3] }; })
+    };
+  }
+  // HELPERS-END
+
+  /* ---------- glyph list ---------- */
+  var GLYPHS = [
+    { id: 'a',  label: 'a',      uni: '\u1700', group: 'Vowels', type: 'base' },
+    { id: 'i',  label: 'i / e',  uni: '\u1701', group: 'Vowels', type: 'base' },
+    { id: 'u',  label: 'u / o',  uni: '\u1702', group: 'Vowels', type: 'base' },
+    { id: 'ba',  label: 'ba',      uni: '\u170A', group: 'Consonants', type: 'base' },
+    { id: 'ka',  label: 'ka',      uni: '\u1703', group: 'Consonants', type: 'base' },
+    { id: 'da',  label: 'da / ra', uni: '\u1707', group: 'Consonants', type: 'base' },
+    { id: 'ga',  label: 'ga',      uni: '\u1704', group: 'Consonants', type: 'base' },
+    { id: 'ha',  label: 'ha',      uni: '\u1711', group: 'Consonants', type: 'base' },
+    { id: 'la',  label: 'la',      uni: '\u170E', group: 'Consonants', type: 'base' },
+    { id: 'ma',  label: 'ma',      uni: '\u170B', group: 'Consonants', type: 'base' },
+    { id: 'na',  label: 'na',      uni: '\u1708', group: 'Consonants', type: 'base' },
+    { id: 'nga', label: 'nga',     uni: '\u1705', group: 'Consonants', type: 'base' },
+    { id: 'pa',  label: 'pa',      uni: '\u1709', group: 'Consonants', type: 'base' },
+    { id: 'sa',  label: 'sa',      uni: '\u1710', group: 'Consonants', type: 'base' },
+    { id: 'ta',  label: 'ta',      uni: '\u1706', group: 'Consonants', type: 'base' },
+    { id: 'wa',  label: 'wa',      uni: '\u170F', group: 'Consonants', type: 'base' },
+    { id: 'ya',  label: 'ya',      uni: '\u170C', group: 'Consonants', type: 'base' },
+    { id: 'mark-i',      label: 'i-mark (above)',     uni: '\u1712', group: 'Marks', type: 'mark' },
+    { id: 'mark-u',      label: 'u-mark (below)',     uni: '\u1713', group: 'Marks', type: 'mark' },
+    { id: 'mark-virama', label: 'cross (silences the vowel)', uni: '\u1714', group: 'Marks', type: 'mark' }
+  ];
+
+  // Tonight's order: everything needed for "mahal kita" comes first.
+  var STARTER = ['ma', 'ha', 'la', 'ka', 'ta', 'mark-i', 'mark-virama'];
+
+  function byId(id) {
+    for (var i = 0; i < GLYPHS.length; i++) { if (GLYPHS[i].id === id) { return GLYPHS[i]; } }
+    return GLYPHS[0];
+  }
+
+  /* ---------- state ---------- */
+  var KEY = 'sulat.capture.v1';
+  var BASE = 18; // ink width in 1000-unit space
+  var state = {
+    id: 'ma',
+    strokes: [],
+    saved: {},
+    showOrder: true,
+    allowFinger: true,
+    penSeen: false,
+    dirty: false
+  };
+  var cur = null; // stroke being drawn
+
+  var pad = document.getElementById('pad');
+  var ctx = pad.getContext('2d');
+  var size = 0, dpr = 1;
+
+  var elStatus = document.getElementById('status');
+  var elUndo = document.getElementById('undo');
+  var elClear = document.getElementById('clear');
+  var elReplay = document.getElementById('replay');
+  var elSave = document.getElementById('save');
+  var elShowOrder = document.getElementById('showOrder');
+  var elAllowFinger = document.getElementById('allowFinger');
+
+  function say(msg) { elStatus.textContent = msg; }
+
+  function loadSaved() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (raw) { state.saved = JSON.parse(raw) || {}; }
+    } catch (e) { /* storage unavailable: carry on without it */ }
+  }
+
+  function persist() {
+    try { localStorage.setItem(KEY, JSON.stringify(state.saved)); }
+    catch (e) { say('This browser could not store your glyphs. Download the JSON now.'); }
+  }
+
+  /* ---------- drawing ---------- */
+  function resize() {
+    var r = pad.getBoundingClientRect();
+    if (size && r.width === size && (window.devicePixelRatio || 1) === dpr) { return; }
+    dpr = window.devicePixelRatio || 1;
+    size = r.width;
+    pad.width = Math.round(r.width * dpr);
+    pad.height = Math.round(r.width * dpr);
+    redraw();
+  }
+
+  function begin() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, size, size);
+  }
+
+  function drawGuides() {
+    var k = size / 1000;
+    ctx.save();
+    ctx.strokeStyle = '#e6e9ee';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(500 * k, 0); ctx.lineTo(500 * k, size);
+    ctx.moveTo(0, 500 * k); ctx.lineTo(size, 500 * k);
+    ctx.stroke();
+    ctx.setLineDash([6, 6]);
+    ctx.strokeRect(120 * k, 120 * k, 760 * k, 760 * k);
+    ctx.restore();
+  }
+
+  function drawStroke(pts, dot) {
+    var k = size / 1000;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#14161a';
+    ctx.fillStyle = '#14161a';
+    if (dot || pts.length === 1) {
+      ctx.beginPath();
+      ctx.arc(pts[0].x * k, pts[0].y * k, BASE * (dot ? 0.95 : 0.5) * k, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
+    for (var i = 1; i < pts.length; i++) {
+      var a = pts[i - 1], b = pts[i];
+      ctx.lineWidth = BASE * (0.55 + 0.9 * (b.p || 0.5)) * k;
+      ctx.beginPath();
+      ctx.moveTo(a.x * k, a.y * k);
+      ctx.lineTo(b.x * k, b.y * k);
+      ctx.stroke();
+    }
+  }
+
+  function drawMarkers() {
+    var k = size / 1000;
+    ctx.save();
+    ctx.font = 'bold ' + Math.max(11, Math.round(17 * k)) + 'px -apple-system, Helvetica, Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    state.strokes.forEach(function (s, i) {
+      var p = s.pts[0];
+      var x = Math.min(960, Math.max(40, p.x - 26));
+      var y = Math.min(960, Math.max(40, p.y - 26));
+      ctx.beginPath();
+      ctx.arc(x * k, y * k, 17 * k, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(31,58,138,0.92)';
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.fillText(String(i + 1), x * k, y * k + 1);
+    });
+    ctx.restore();
+  }
+
+  function redraw() {
+    begin();
+    drawGuides();
+    drawReference();
+    state.strokes.forEach(function (s) { drawStroke(s.pts, s.dot); });
+    if (cur) { drawStroke(cur.pts, false); }
+    if (state.showOrder && !replay.active) { drawMarkers(); }
+    updateButtons();
+  }
+
+  /* ---------- reference letter for marks ---------- */
+  function refFor(g) {
+    if (g.type !== 'mark') { return null; }
+    var order = ['ka'].concat(STARTER, GLYPHS.map(function (x) { return x.id; }));
+    for (var i = 0; i < order.length; i++) {
+      var rec = state.saved[order[i]];
+      if (rec && rec.type === 'base') { return { id: order[i], rec: rec }; }
+    }
+    return null;
+  }
+
+  function boxOf(rec) {
+    var b = { x0: 1000, y0: 1000, x1: 0, y1: 0 };
+    rec.strokes.forEach(function (s) {
+      s.points.forEach(function (p) {
+        b.x0 = Math.min(b.x0, p[0]); b.y0 = Math.min(b.y0, p[1]);
+        b.x1 = Math.max(b.x1, p[0]); b.y1 = Math.max(b.y1, p[1]);
+      });
+    });
+    return { x0: r1(b.x0), y0: r1(b.y0), x1: r1(b.x1), y1: r1(b.y1) };
+  }
+
+  function drawReference() {
+    var ref = refFor(byId(state.id));
+    if (!ref) { return; }
+    ctx.save();
+    ctx.globalAlpha = 0.18;
+    ref.rec.strokes.map(expand).forEach(function (s) { drawStroke(s.pts, s.dot); });
+    ctx.restore();
+  }
+
+  /* ---------- replay ---------- */
+  var replay = { active: false, raf: 0, start: 0, items: [] };
+
+  function stopReplay() {
+    if (replay.raf) { cancelAnimationFrame(replay.raf); }
+    replay.active = false;
+    replay.raf = 0;
+  }
+
+  function playReplay() {
+    if (!state.strokes.length) { return; }
+    stopReplay();
+    var t0 = 0;
+    replay.items = state.strokes.map(function (s) {
+      var dur = Math.max(180, s.dur || 0);
+      var item = { s: s, start: t0, dur: dur };
+      t0 += dur + 280;
+      return item;
+    });
+    replay.active = true;
+    replay.start = performance.now();
+    replay.raf = requestAnimationFrame(frame);
+  }
+
+  function frame(ts) {
+    if (!replay.active) { return; }
+    var now = ts - replay.start;
+    begin();
+    drawGuides();
+    drawReference();
+    var done = true;
+    replay.items.forEach(function (it) {
+      var local = now - it.start;
+      if (local <= 0) { done = false; return; }
+      if (local < it.dur) { done = false; }
+      var pts = it.s.pts;
+      var lastT = pts[pts.length - 1].t;
+      var limit = local >= it.dur ? lastT : (local / it.dur) * lastT;
+      var vis = [];
+      for (var i = 0; i < pts.length; i++) {
+        if (i === 0 || pts[i].t <= limit) { vis.push(pts[i]); }
+      }
+      drawStroke(vis, it.s.dot);
+    });
+    if (done) { stopReplay(); redraw(); return; }
+    replay.raf = requestAnimationFrame(frame);
+  }
+
+  /* ---------- pointer input ---------- */
+  function toNorm(e) {
+    var r = pad.getBoundingClientRect();
+    return {
+      x: Math.min(1000, Math.max(0, (e.clientX - r.left) / r.width * 1000)),
+      y: Math.min(1000, Math.max(0, (e.clientY - r.top) / r.height * 1000))
+    };
+  }
+
+  function pressure(e) { return e.pressure > 0 ? e.pressure : 0.5; }
+
+  function setAllowFinger(on) {
+    state.allowFinger = on;
+    elAllowFinger.checked = on;
+  }
+
+  pad.addEventListener('pointerdown', function (e) {
+    if (cur) { return; } // one stroke at a time; ignore a second finger or palm
+    if (e.pointerType === 'pen' && !state.penSeen) {
+      state.penSeen = true;
+      setAllowFinger(false);
+      say('Pencil detected, so finger input is off. Turn on “Allow finger” to draw with a finger.');
+    }
+    if (e.pointerType === 'touch' && !state.allowFinger) { return; }
+    if (e.pointerType === 'mouse' && e.button > 0) { return; }
+    e.preventDefault();
+    stopReplay();
+    try { pad.setPointerCapture(e.pointerId); } catch (err) { /* not fatal */ }
+    var n = toNorm(e);
+    cur = { pid: e.pointerId, t0: e.timeStamp, pts: [{ x: n.x, y: n.y, t: 0, p: pressure(e) }] };
+    redraw();
+  });
+
+  pad.addEventListener('pointermove', function (e) {
+    if (!cur || e.pointerId !== cur.pid) { return; }
+    e.preventDefault();
+    var evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    if (!evs.length) { evs = [e]; }
+    for (var i = 0; i < evs.length; i++) {
+      var ev = evs[i];
+      var n = toNorm(ev);
+      var last = cur.pts[cur.pts.length - 1];
+      var dx = n.x - last.x, dy = n.y - last.y;
+      if (dx * dx + dy * dy < 0.16) { continue; }
+      var np = { x: n.x, y: n.y, t: Math.max(0, ev.timeStamp - cur.t0), p: pressure(ev) };
+      cur.pts.push(np);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      drawStroke([last, np], false);
+    }
+  });
+
+  function finish(e) {
+    if (!cur || (e && e.pointerId !== cur.pid)) { return; }
+    var pts = cur.pts;
+    cur = null;
+    var minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9, sumP = 0;
+    pts.forEach(function (p) {
+      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+      sumP += p.p;
+    });
+    var stroke;
+    if (Math.max(maxX - minX, maxY - minY) < 10) {
+      // a tap: store a single dot (kudlit)
+      stroke = { dot: true, dur: 0, pts: [{ x: (minX + maxX) / 2, y: (minY + maxY) / 2, t: 0, p: sumP / pts.length }] };
+    } else {
+      stroke = { dot: false, dur: pts[pts.length - 1].t, pts: pts };
+    }
+    state.strokes.push(stroke);
+    state.dirty = true;
+    redraw();
+  }
+  pad.addEventListener('pointerup', finish);
+  pad.addEventListener('pointercancel', finish);
+  pad.addEventListener('lostpointercapture', finish);
+  window.addEventListener('pointerup', finish);
+  pad.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+  /* ---------- glyph selection and saving ---------- */
+  function renderHead() {
+    var g = byId(state.id);
+    document.getElementById('glyphName').textContent = g.label;
+    document.getElementById('glyphUni').textContent = g.uni || '';
+    var hint;
+    if (g.type === 'mark') {
+      var ref = refFor(g);
+      hint = ref
+        ? 'Your saved ' + byId(ref.id).label + ' is shown faintly. Draw the mark where it sits on that letter.'
+        : 'Save ka first, so the mark has a real letter to sit beside.';
+    } else {
+      hint = 'Draw the whole glyph in one go, as you’d write it on paper.';
+    }
+    document.getElementById('hint').textContent = hint;
+  }
+
+  function renderChips() {
+    var host = document.getElementById('chips');
+    host.innerHTML = '';
+    var groups = ['Vowels', 'Consonants', 'Marks'];
+    groups.forEach(function (name) {
+      var h = document.createElement('div');
+      h.textContent = name;
+      h.style.cssText = 'font-weight:600;margin-top:6px';
+      host.appendChild(h);
+      var row = document.createElement('div');
+      row.className = 'chips';
+      GLYPHS.filter(function (g) { return g.group === name; }).forEach(function (g) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'chip' + (g.id === state.id ? ' active' : '') + (state.saved[g.id] ? ' done' : '');
+        b.textContent = g.label;
+        b.addEventListener('click', function () { selectGlyph(g.id); });
+        row.appendChild(b);
+      });
+      host.appendChild(row);
+    });
+    var n = GLYPHS.filter(function (g) { return state.saved[g.id]; }).length;
+    document.getElementById('progress').textContent = n + ' of ' + GLYPHS.length + ' saved';
+  }
+
+  function selectGlyph(id) {
+    if (id === state.id) { return; }
+    if (state.dirty && state.strokes.length) {
+      if (!window.confirm('Discard the strokes you haven’t saved?')) { return; }
+    }
+    stopReplay();
+    cur = null;
+    state.id = id;
+    var rec = state.saved[id];
+    state.strokes = rec ? rec.strokes.map(expand) : [];
+    state.dirty = false;
+    renderHead();
+    renderChips();
+    redraw();
+    say(rec ? 'Loaded your saved ' + byId(id).label + '. Draw again and save to replace it.' : '');
+  }
+
+  function nextUnsaved() {
+    for (var s = 0; s < STARTER.length; s++) {
+      if (!state.saved[STARTER[s]] && STARTER[s] !== state.id) { return STARTER[s]; }
+    }
+    var start = GLYPHS.indexOf(byId(state.id));
+    for (var step = 1; step <= GLYPHS.length; step++) {
+      var g = GLYPHS[(start + step) % GLYPHS.length];
+      if (!state.saved[g.id]) { return g.id; }
+    }
+    return null;
+  }
+
+  function saveGlyph() {
+    if (!state.strokes.length) { say('Draw the glyph first.'); return; }
+    var g = byId(state.id);
+    var strokes = state.strokes.map(compact);
+    var record = {
+      sound: g.label,
+      unicode: g.uni || '',
+      type: g.type,
+      strokes: strokes,
+      savedAt: new Date().toISOString()
+    };
+    if (g.type === 'mark') {
+      var ref = refFor(g);
+      if (ref) { record.reference = ref.id; record.referenceBox = boxOf(ref.rec); }
+    }
+    state.saved[g.id] = record;
+    state.dirty = false;
+    persist();
+    var count = strokes.length;
+    var msg = 'Saved ' + g.label + ' (' + count + (count === 1 ? ' stroke' : ' strokes') + ').';
+    var next = nextUnsaved();
+    if (next) {
+      selectGlyph(next);
+      say(msg + ' Next: ' + byId(next).label + '.');
+    } else {
+      renderChips();
+      say(msg + ' Every glyph is saved. Download the JSON when you’re ready.');
+    }
+  }
+
+  /* ---------- export ---------- */
+  function buildExport() {
+    var out = { pack: 'baybayin', version: 1, canvas: 1000, exportedAt: new Date().toISOString(), glyphs: {} };
+    GLYPHS.forEach(function (g) { if (state.saved[g.id]) { out.glyphs[g.id] = state.saved[g.id]; } });
+    return JSON.stringify(out);
+  }
+
+  function download(name, blob) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 30000);
+  }
+
+  function savedCount() {
+    return GLYPHS.filter(function (g) { return state.saved[g.id]; }).length;
+  }
+
+  document.getElementById('exportJson').addEventListener('click', function () {
+    if (!savedCount()) { say('Save at least one glyph first.'); return; }
+    download('sulat-baybayin-strokes.json', new Blob([buildExport()], { type: 'application/json' }));
+    say('Downloaded ' + savedCount() + ' glyphs.');
+  });
+
+  document.getElementById('copyJson').addEventListener('click', function () {
+    if (!savedCount()) { say('Save at least one glyph first.'); return; }
+    var text = buildExport();
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try { document.execCommand('copy'); say('Copied ' + savedCount() + ' glyphs.'); }
+      catch (err) { say('Copy failed. Use Download JSON instead.'); }
+      document.body.removeChild(ta);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { say('Copied ' + savedCount() + ' glyphs.'); }, fallback);
+    } else { fallback(); }
+  });
+
+  document.getElementById('exportPng').addEventListener('click', function () {
+    var rec = state.saved[state.id];
+    if (!rec) { say('Save this glyph first, then export its image.'); return; }
+    var S = 512;
+    var c = document.createElement('canvas');
+    c.width = S; c.height = S;
+    var x = c.getContext('2d');
+    x.fillStyle = '#fff';
+    x.fillRect(0, 0, S, S);
+    x.scale(S / 1000, S / 1000);
+    x.strokeStyle = '#111';
+    x.lineCap = 'round';
+    x.lineJoin = 'round';
+    rec.strokes.forEach(function (s) {
+      x.lineWidth = s.kind === 'dot' ? 34 : 22;
+      x.stroke(new Path2D(s.path));
+    });
+    c.toBlob(function (b) { download('sulat-' + state.id + '.png', b); say('Downloaded the image for ' + byId(state.id).label + '.'); }, 'image/png');
+  });
+
+  document.getElementById('reset').addEventListener('click', function () {
+    if (!window.confirm('Delete every saved glyph on this device? Download the JSON first if you want to keep them.')) { return; }
+    state.saved = {};
+    persist();
+    state.strokes = [];
+    state.dirty = false;
+    renderChips();
+    redraw();
+    say('All saved glyphs deleted.');
+  });
+
+  /* ---------- controls ---------- */
+  function updateButtons() {
+    var has = state.strokes.length > 0;
+    elUndo.disabled = !has;
+    elClear.disabled = !has;
+    elReplay.disabled = !has;
+    elSave.disabled = !has;
+  }
+
+  elUndo.addEventListener('click', function () { stopReplay(); state.strokes.pop(); state.dirty = true; redraw(); });
+  elClear.addEventListener('click', function () { stopReplay(); state.strokes = []; state.dirty = true; redraw(); });
+  elReplay.addEventListener('click', playReplay);
+  elSave.addEventListener('click', saveGlyph);
+  elShowOrder.addEventListener('change', function () { state.showOrder = elShowOrder.checked; redraw(); });
+  elAllowFinger.addEventListener('change', function () { state.allowFinger = elAllowFinger.checked; });
+
+  window.addEventListener('resize', resize);
+  if ('ResizeObserver' in window) { new ResizeObserver(function () { resize(); }).observe(pad); }
+  window.addEventListener('orientationchange', function () { setTimeout(resize, 200); });
+
+  /* ---------- start ---------- */
+  loadSaved();
+  var startId = null;
+  for (var si = 0; si < STARTER.length; si++) {
+    if (!state.saved[STARTER[si]]) { startId = STARTER[si]; break; }
+  }
+  if (!startId) {
+    var firstUnsaved = GLYPHS.filter(function (g) { return !state.saved[g.id]; })[0];
+    startId = firstUnsaved ? firstUnsaved.id : 'ma';
+  }
+  state.id = startId;
+  var rec0 = state.saved[state.id];
+  state.strokes = rec0 ? rec0.strokes.map(expand) : [];
+  renderHead();
+  renderChips();
+  resize();
+})();
+</script>
+</body>
+</html>
