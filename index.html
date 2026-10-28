@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sulat</title>
+<style>
+  /* Black is transparent on the Display, so the page is black with light ink. */
+  :root {
+    --ground: #000;
+    --ink: #f2efe8;
+    --quiet: #a9a59b;
+    --line: #f2efe8;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: Georgia, "Times New Roman", serif;
+  }
+  main {
+    width: min(100vw, 600px);
+    height: min(100vh, 600px);
+    margin: 0 auto;
+    padding: 36px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  h1 {
+    margin: 0;
+    font-size: 56px;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+  }
+  .sub { margin: 8px 0 0; font-size: 22px; color: var(--quiet); }
+  svg { width: 100%; max-height: 190px; }
+  .stroke {
+    fill: none;
+    stroke: var(--line);
+    stroke-width: 7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: draw 2.4s ease-in-out 0.4s forwards;
+  }
+  .stroke.replay { animation: none; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    .stroke { animation: none; stroke-dashoffset: 0; }
+  }
+  .row { display: flex; align-items: center; gap: 20px; }
+  button {
+    min-width: 168px;
+    min-height: 88px;
+    padding: 0 24px;
+    font: inherit;
+    font-size: 24px;
+    color: var(--ink);
+    background: transparent;
+    border: 2px solid var(--ink);
+    border-radius: 14px;
+    cursor: pointer;
+  }
+  button:focus-visible { outline: 4px solid var(--ink); outline-offset: 4px; }
+  .readout { font-size: 20px; color: var(--quiet); line-height: 1.35; }
+  .readout strong { color: var(--ink); font-weight: 400; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Sulat</h1>
+    <p class="sub">A handwriting tutor. Hello from the glasses.</p>
+  </header>
+
+  <svg viewBox="0 0 340 200" role="img" aria-label="A single pen stroke drawing itself">
+    <path id="stroke" class="stroke" pathLength="1"
+          d="M 24 150 C 70 20, 150 20, 170 96 S 250 188, 316 52"/>
+  </svg>
+
+  <div class="row">
+    <button id="select" type="button">Select</button>
+    <p class="readout" id="readout">Last input: <strong>none yet</strong><br>Try the arrows or Enter.</p>
+  </div>
+</main>
+
+<script>
+  const readout = document.getElementById('readout');
+  const stroke = document.getElementById('stroke');
+  const button = document.getElementById('select');
+
+  function show(label) {
+    readout.innerHTML = 'Last input: <strong>' + label + '</strong>';
+  }
+
+  function replay() {
+    stroke.classList.add('replay');
+    void stroke.getBoundingClientRect();
+    stroke.classList.remove('replay');
+    stroke.style.animation = 'none';
+    void stroke.getBoundingClientRect();
+    stroke.style.animation = '';
+  }
+
+  // The Neural Band arrives as arrow keys and Enter, so log exactly what comes in.
+  document.addEventListener('keydown', function (e) {
+    show(e.key);
+  });
+
+  button.addEventListener('click', function () {
+    show('Select pressed');
+    replay();
+  });
+
+  button.focus();
+</script>
+</body>
+</html>
