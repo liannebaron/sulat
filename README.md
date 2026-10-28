@@ -17,7 +17,7 @@ It runs on a phone and on Meta Ray-Ban Display glasses.
 
 ## Status
 
-Day 1 (Oct 26, 2026): repo created, hello page deployed.
+Day 1 (Oct 28, 2026): repo created, hello page deployed.
 
 ## Built during the event
 
