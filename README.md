@@ -32,7 +32,7 @@ I'm a hand-letterer, but I'm still learning Baybayin myself. The glyphs and stro
  
 Everything in this repository is created during the hackathon window (Oct 26 to Nov 4, 2026), with timestamped commits. The only pre-existing work is a small API proxy pattern from my own site, baybayinscript.com, which will be disclosed here if any of it is reused.
  
-How it's built: the hello page and the stroke-capture page were written with help from Claude (Anthropic). Meta's Muse Code is used for the platform-specific pieces, and this section will record which tool did what.
+How it’s built: the hello page, stroke-capture page, Sulat engine, Show me page and glyph review sheet were built with Claude (Anthropic). Meta’s Muse Code will build the platform-specific pieces (voice input and Spark tool-calling), and this section records which tool did what.
  
 ## Planned stack
  
