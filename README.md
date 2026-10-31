@@ -27,6 +27,7 @@ I'm a hand-letterer, but I'm still learning Baybayin myself. The glyphs and stro
 ## Status
  
 - Oct 28, 2026: repo created, hello page live at sulat-7sw.pages.dev, stroke-capture page added (`capture.html`)
+- Oct 29, 2026: all 20 glyphs and 3 marks recorded by hand (packs/baybayin.json); Sulat engine and Show me page (animate.html); first Spark vision test on paper
 
 ## Built during the event
  
