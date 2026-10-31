@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sulat · Show me</title>
+<style>
+  :root {
+    --page: #eceff3;
+    --card: #ffffff;
+    --ink: #14161a;
+    --quiet: #5d6572;
+    --line: #d9dde3;
+    --accent: #1f3a8a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 16px;
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+  h1 { margin: 4px 0 2px; font: 400 30px Georgia, "Times New Roman", serif; }
+  .lede { margin: 0 0 16px; color: var(--quiet); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  input[type="text"] {
+    flex: 1 1 260px;
+    min-height: 48px;
+    padding: 0 14px;
+    font: inherit;
+    font-size: 18px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+  button, .btn {
+    font: inherit;
+    min-height: 48px;
+    padding: 0 18px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink);
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    touch-action: manipulation;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--accent); border-color: var(--accent); }
+  button:focus-visible, input:focus-visible, .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .starters { margin-top: 12px; }
+  .starters button { min-height: 44px; }
+  .starters small { color: var(--quiet); margin-left: 6px; }
+  #stage svg { display: block; width: 100%; height: auto; max-height: 340px; color: var(--ink); }
+  #stage .label { fill: var(--quiet); font-family: -apple-system, Helvetica, Arial, sans-serif; }
+  #stage .label.active { fill: var(--accent); font-weight: 700; }
+  #syllables { margin: 12px 0 4px; font-size: 20px; letter-spacing: 0.02em; }
+  #breakdown { margin: 6px 0 0; padding-left: 20px; color: var(--quiet); }
+  #status { min-height: 1.4em; color: var(--quiet); margin: 8px 0 0; }
+
+  /* Glasses view: 600x600, black is see-through on the Display, one word per card. */
+  body.glasses { background: #000; color: #f2efe8; }
+  body.glasses .wrap { display: none; }
+  #lens { display: none; }
+  body.glasses #lens {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    width: min(100vw, 600px);
+    height: min(100vh, 600px);
+    margin: 0 auto;
+    padding: 28px 32px;
+    font-family: Georgia, "Times New Roman", serif;
+  }
+  #lensWord { font-size: 30px; }
+  #lensCount { font-size: 18px; color: #a9a59b; }
+  #lensStage svg { display: block; width: 100%; height: auto; max-height: 380px; color: #f2efe8; }
+  #lensStage .label { fill: #a9a59b; font-family: Georgia, serif; }
+  #lensStage .label.active { fill: #f2efe8; }
+  #lensHint { font-size: 18px; color: #a9a59b; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Show me</h1>
+  <p class="lede">Type a word or phrase in Tagalog and watch it written in Baybayin, stroke by stroke, in the order the strokes are drawn.</p>
+
+  <div class="card">
+    <div class="row">
+      <label for="phrase" style="position:absolute;left:-9999px">Phrase</label>
+      <input id="phrase" type="text" value="mahal kita" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button id="go" type="button" class="primary">Show me</button>
+      <button id="replay" type="button">Replay</button>
+    </div>
+    <div class="row starters" id="starters"></div>
+  </div>
+
+  <div class="card">
+    <div id="stage" aria-live="polite"></div>
+    <p id="syllables"></p>
+    <ul id="breakdown"></ul>
+    <div class="row" style="margin-top:12px">
+      <button id="slow" type="button" aria-pressed="false">Slow</button>
+      <a id="lensLink" class="btn" href="#">Open glasses view</a>
+    </div>
+    <p id="status" role="status"></p>
+  </div>
+</div>
+
+<div id="lens" aria-live="polite">
+  <div class="row" style="justify-content:space-between">
+    <span id="lensWord"></span>
+    <span id="lensCount"></span>
+  </div>
+  <div id="lensStage"></div>
+  <div id="lensHint">← → next word · Enter to replay</div>
+</div>
+
+<script src="sulat-engine.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var STARTERS = [
+    { text: 'mahal kita', en: 'I love you' },
+    { text: 'salamat', en: 'thank you' },
+    { text: 'kumusta', en: 'how are you' },
+    { text: 'magandang umaga', en: 'good morning' },
+    { text: 'paalam', en: 'goodbye' }
+  ];
+
+  var params = new URLSearchParams(window.location.search);
+  var glasses = params.get('view') === 'glasses';
+  document.body.classList.toggle('glasses', glasses);
+
+  var $ = function (id) { return document.getElementById(id); };
+  var input = $('phrase');
+  if (params.get('text')) { input.value = params.get('text'); }
+
+  var pack = null;
+  var ctrl = null;
+  var words = [];
+  var wordIndex = 0;
+  var speed = params.get('speed') === 'slow' ? 0.55 : 1;
+  $('slow').setAttribute('aria-pressed', speed < 1 ? 'true' : 'false');
+
+  function status(msg) { $('status').textContent = msg; }
+
+  function highlighter(labels) {
+    return function (i) {
+      labels().forEach(function (n, k) { n.classList.toggle('active', k === i); });
+    };
+  }
+
+  function updateLensLink() {
+    var q = new URLSearchParams({ view: 'glasses', text: input.value });
+    if (speed < 1) { q.set('speed', 'slow'); }
+    $('lensLink').href = '?' + q.toString();
+  }
+
+  function renderPhrase() {
+    if (!pack) { return; }
+    words = Sulat.syllabify(input.value);
+    updateLensLink();
+    if (!words.length) { $('stage').innerHTML = ''; $('syllables').textContent = ''; $('breakdown').innerHTML = ''; return; }
+    var lay = Sulat.layout(pack, words);
+    var c = null;
+    c = Sulat.render($('stage'), pack, lay, {
+      labels: true,
+      ariaLabel: input.value + ' in Baybayin',
+      onGlyph: highlighter(function () { return c ? c.labels : []; })
+    });
+    ctrl = c;
+
+    $('syllables').textContent = words.map(function (w) {
+      return w.tokens.map(function (t) { return t.text; }).join(' · ');
+    }).join('   ');
+    var list = $('breakdown');
+    list.innerHTML = '';
+    words.forEach(function (w) {
+      w.tokens.forEach(function (t) {
+        var li = document.createElement('li');
+        li.textContent = Sulat.describe(t);
+        list.appendChild(li);
+      });
+    });
+    status(lay.missing.length ? 'Missing from the stroke pack: ' + lay.missing.join(', ') : '');
+    ctrl.play({ speed: speed });
+  }
+
+  function renderLensWord() {
+    if (!pack) { return; }
+    words = Sulat.syllabify(input.value);
+    if (!words.length) { return; }
+    wordIndex = (wordIndex + words.length) % words.length;
+    var w = words[wordIndex];
+    $('lensWord').textContent = w.text;
+    $('lensCount').textContent = words.length > 1 ? (wordIndex + 1) + ' / ' + words.length : '';
+    var lay = Sulat.layout(pack, [w], { pad: 60 });
+    var c = null;
+    c = Sulat.render($('lensStage'), pack, lay, {
+      labels: true,
+      labelSize: 90,
+      ink: 26,
+      dotInk: 38,
+      ariaLabel: w.text + ' in Baybayin',
+      onGlyph: highlighter(function () { return c ? c.labels : []; })
+    });
+    ctrl = c;
+    ctrl.play({ speed: speed });
+  }
+
+  function replay() { if (ctrl) { ctrl.play({ speed: speed }); } }
+
+  STARTERS.forEach(function (s) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.innerHTML = '';
+    b.appendChild(document.createTextNode(s.text));
+    var sm = document.createElement('small');
+    sm.textContent = s.en;
+    b.appendChild(sm);
+    b.addEventListener('click', function () { input.value = s.text; renderPhrase(); });
+    $('starters').appendChild(b);
+  });
+
+  $('go').addEventListener('click', renderPhrase);
+  $('replay').addEventListener('click', replay);
+  $('slow').addEventListener('click', function () {
+    speed = speed < 1 ? 1 : 0.55;
+    $('slow').setAttribute('aria-pressed', speed < 1 ? 'true' : 'false');
+    updateLensLink();
+    replay();
+  });
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); renderPhrase(); }
+  });
+  input.addEventListener('input', updateLensLink);
+
+  // The Neural Band arrives as arrow keys and Enter.
+  document.addEventListener('keydown', function (e) {
+    if (e.target === input) { return; }
+    if (glasses) {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); wordIndex += 1; renderLensWord(); }
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); wordIndex -= 1; renderLensWord(); }
+      else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); replay(); }
+    } else if (e.key === 'Enter' && e.target === document.body) {
+      e.preventDefault();
+      replay();
+    }
+  });
+
+  Sulat.loadPack('packs/baybayin.json').then(function (p) {
+    pack = p;
+    if (glasses) { renderLensWord(); } else { renderPhrase(); }
+  }).catch(function (err) {
+    var msg = 'Couldn’t load packs/baybayin.json. Open this page from your Sulat site, not as a local file. (' + err.message + ')';
+    if (glasses) { $('lensWord').textContent = msg; } else { status(msg); }
+  });
+})();
+</script>
+</body>
+</html>
