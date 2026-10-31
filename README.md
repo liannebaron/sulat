@@ -34,6 +34,15 @@ I'm a hand-letterer, but I'm still learning Baybayin myself. The glyphs and stro
 Everything in this repository is created during the hackathon window (Oct 26 to Nov 4, 2026), with timestamped commits. The only pre-existing work is a small API proxy pattern from my own site, baybayinscript.com, which will be disclosed here if any of it is reused.
  
 How it’s built: the hello page, stroke-capture page, Sulat engine, Show me page and glyph review sheet were built with Claude (Anthropic). Meta’s Muse Code will build the platform-specific pieces (voice input and Spark tool-calling), and this section records which tool did what.
+
+## Evaluation log
+
+Spark vision on paper photos (Muse Spark 1.3), Oct 29, 2026. Ten attempts at ma, ka and ki, drawn correctly or wrong on purpose.
+
+- Round 1, first prompt: 5 of 10 judged right. Spark caught every planted flaw, but flagged 3 of 4 correct attempts as wrong, and without a reference image it misread ka as ma.
+- Round 2, revised prompt ("normal handwriting varies"; never identify the glyph) plus a reference built from my own strokes: 5 of 6 judged right. Correct attempts passed with gentle tips, and a vowel dot on the wrong side was caught.
+
+What changed in the design: Spark is never asked which glyph it's looking at. The app always gives it the target and a reference, and the deterministic stroke scorer has the final say on traced input.
  
 ## Planned stack
  
