@@ -39,8 +39,8 @@ How it’s built: the hello page, stroke-capture page, Sulat engine, Show me pag
 
 Spark vision on paper photos (Muse Spark 1.3), Oct 29, 2026. Ten attempts at ma, ka and ki, drawn correctly or wrong on purpose.
 
-- Round 1, first prompt: 5 of 10 judged right. Spark caught every planted flaw, but flagged 3 of 4 correct attempts as wrong, and without a reference image it misread ka as ma.
-- Round 2, revised prompt ("normal handwriting varies"; never identify the glyph) plus a reference built from my own strokes: 5 of 6 judged right. Correct attempts passed with gentle tips, and a vowel dot on the wrong side was caught.
+- Round 1, first prompt: 6 of 10 judged right. Spark caught every planted flaw, but called 2 of 3 correct attempts wrong, and without a reference image it misread ka as ma.
+- Round 2, revised prompt ("normal handwriting varies"; never identify the glyph) plus a reference built from my own strokes: 6 of 6 judged right. Correct attempts passed with gentle tips, and it caught a middle bar that didn't connect and a vowel dot on the wrong side.
 
 What changed in the design: Spark is never asked which glyph it's looking at. The app always gives it the target and a reference, and the deterministic stroke scorer has the final say on traced input.
  
