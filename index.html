@@ -2,121 +2,115 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Sulat</title>
 <style>
-  /* Black is transparent on the Display, so the page is black with light ink. */
-  :root {
-    --ground: #000;
-    --ink: #f2efe8;
-    --quiet: #a9a59b;
-    --line: #f2efe8;
-  }
+  /* Built for the Ray-Ban Display: black is see-through, so everything is bright white,
+     large, and one idea per screen. Also works in any browser. */
+  :root { --ink: #fff; }
   * { box-sizing: border-box; }
-  html, body {
-    margin: 0;
-    height: 100%;
-    background: var(--ground);
-    color: var(--ink);
-    font-family: Georgia, "Times New Roman", serif;
-  }
+  html, body { margin: 0; height: 100%; background: #000; color: var(--ink); }
+  body { font-family: Georgia, "Times New Roman", serif; }
   main {
     width: min(100vw, 600px);
     height: min(100vh, 600px);
     margin: 0 auto;
-    padding: 36px;
+    padding: 28px 32px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
   }
-  h1 {
-    margin: 0;
-    font-size: 56px;
-    font-weight: 400;
-    letter-spacing: 0.01em;
+  header { display: flex; justify-content: space-between; align-items: baseline; }
+  h1 { margin: 0; font-size: 44px; font-weight: 400; }
+  #count { font-size: 26px; }
+  .pick { display: flex; align-items: center; gap: 12px; }
+  .pick .text { flex: 1; text-align: center; }
+  #phrase { font-size: 58px; line-height: 1.1; }
+  #english { margin-top: 10px; font-size: 32px; opacity: 0.85; }
+  .step {
+    flex: none; width: 64px; min-height: 88px;
+    font: 44px Georgia, serif; color: var(--ink);
+    background: transparent; border: 0; cursor: pointer;
   }
-  .sub { margin: 8px 0 0; font-size: 22px; color: var(--quiet); }
-  svg { width: 100%; max-height: 190px; }
-  .stroke {
-    fill: none;
-    stroke: var(--line);
-    stroke-width: 7;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    stroke-dasharray: 1;
-    stroke-dashoffset: 1;
-    animation: draw 2.4s ease-in-out 0.4s forwards;
+  .bottom { display: flex; align-items: center; gap: 24px; }
+  #start {
+    min-width: 190px; min-height: 88px; padding: 0 24px;
+    font: 30px Georgia, "Times New Roman", serif; color: var(--ink);
+    background: transparent; border: 3px solid var(--ink); border-radius: 16px; cursor: pointer;
   }
-  .stroke.replay { animation: none; }
-  @keyframes draw { to { stroke-dashoffset: 0; } }
-  @media (prefers-reduced-motion: reduce) {
-    .stroke { animation: none; stroke-dashoffset: 0; }
-  }
-  .row { display: flex; align-items: center; gap: 20px; }
-  button {
-    min-width: 168px;
-    min-height: 88px;
-    padding: 0 24px;
-    font: inherit;
-    font-size: 24px;
-    color: var(--ink);
-    background: transparent;
-    border: 2px solid var(--ink);
-    border-radius: 14px;
-    cursor: pointer;
-  }
-  button:focus-visible { outline: 4px solid var(--ink); outline-offset: 4px; }
-  .readout { font-size: 20px; color: var(--quiet); line-height: 1.35; }
-  .readout strong { color: var(--ink); font-weight: 400; }
+  #start:focus-visible { outline: 4px solid var(--ink); outline-offset: 5px; }
+  #hint { font-size: 24px; line-height: 1.3; }
+  .talk { position: fixed; right: 12px; bottom: 8px; font: 14px -apple-system, Helvetica, Arial, sans-serif; opacity: 0.6; }
+  .talk a { color: var(--ink); }
+  @media (max-height: 560px) { #phrase { font-size: 44px; } #english { font-size: 26px; } }
 </style>
 </head>
 <body>
 <main>
   <header>
     <h1>Sulat</h1>
-    <p class="sub">A handwriting tutor. Hello from the glasses.</p>
+    <span id="count" aria-live="polite"></span>
   </header>
 
-  <svg viewBox="0 0 340 200" role="img" aria-label="A single pen stroke drawing itself">
-    <path id="stroke" class="stroke" pathLength="1"
-          d="M 24 150 C 70 20, 150 20, 170 96 S 250 188, 316 52"/>
-  </svg>
+  <div class="pick">
+    <button class="step" id="prev" type="button" tabindex="-1" aria-label="Previous phrase">‹</button>
+    <div class="text" aria-live="polite">
+      <div id="phrase"></div>
+      <div id="english"></div>
+    </div>
+    <button class="step" id="next" type="button" tabindex="-1" aria-label="Next phrase">›</button>
+  </div>
 
-  <div class="row">
-    <button id="select" type="button">Select</button>
-    <p class="readout" id="readout">Last input: <strong>none yet</strong><br>Try the arrows or Enter.</p>
+  <div class="bottom">
+    <button id="start" type="button">Show me</button>
+    <div id="hint">← → choose a phrase<br>Select to start</div>
   </div>
 </main>
+<div class="talk"><a href="talk.html">Talk to Sulat</a> · <a href="hello.html">Input test</a></div>
 
 <script>
-  const readout = document.getElementById('readout');
-  const stroke = document.getElementById('stroke');
-  const button = document.getElementById('select');
+(function () {
+  'use strict';
 
-  function show(label) {
-    readout.innerHTML = 'Last input: <strong>' + label + '</strong>';
+  var PHRASES = [
+    { text: 'mahal kita', en: 'I love you' },
+    { text: 'salamat', en: 'thank you' },
+    { text: 'kumusta', en: 'how are you' },
+    { text: 'magandang umaga', en: 'good morning' },
+    { text: 'paalam', en: 'goodbye' }
+  ];
+
+  var i = 0;
+  var $ = function (id) { return document.getElementById(id); };
+
+  function go(url) {
+    if (window.__sulatNav) { window.__sulatNav(url); } else { window.location.replace(url); }
   }
 
-  function replay() {
-    stroke.classList.add('replay');
-    void stroke.getBoundingClientRect();
-    stroke.classList.remove('replay');
-    stroke.style.animation = 'none';
-    void stroke.getBoundingClientRect();
-    stroke.style.animation = '';
+  function show() {
+    i = (i + PHRASES.length) % PHRASES.length;
+    $('phrase').textContent = PHRASES[i].text;
+    $('english').textContent = PHRASES[i].en;
+    $('count').textContent = (i + 1) + ' / ' + PHRASES.length;
   }
 
-  // The Neural Band arrives as arrow keys and Enter, so log exactly what comes in.
+  function start() {
+    go('animate.html?view=glasses&text=' + encodeURIComponent(PHRASES[i].text));
+  }
+
+  // The Neural Band arrives as arrow keys, and Select as a click on the focused button.
   document.addEventListener('keydown', function (e) {
-    show(e.key);
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); i += 1; show(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); i -= 1; show(); }
+    else if ((e.key === 'Enter' || e.key === ' ') && e.target !== $('start')) { e.preventDefault(); start(); }
   });
+  $('prev').addEventListener('click', function () { i -= 1; show(); });
+  $('next').addEventListener('click', function () { i += 1; show(); });
+  $('start').addEventListener('click', start);
 
-  button.addEventListener('click', function () {
-    show('Select pressed');
-    replay();
-  });
-
-  button.focus();
+  show();
+  $('start').focus();
+})();
 </script>
 </body>
 </html>
