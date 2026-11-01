@@ -83,8 +83,9 @@
   }
   #lensWord { font-size: 44px; color: #fff; }
   #lensCount { font-size: 26px; color: #fff; }
-  #lensStage svg { display: block; width: 100%; height: auto; max-height: 320px; color: #fff; }
-  #lensStage .label { fill: #fff; opacity: 0.7; font-family: Georgia, serif; }
+  #lensStage svg { display: block; width: 100%; height: auto; max-height: 270px; color: #fff; }
+  #lensNote { font-size: 26px; line-height: 1.25; color: #fff; min-height: 66px; }
+  #lensStage .label { fill: #fff; font-family: Georgia, serif; }
   #lensStage .label.active { opacity: 1; }
   #lensBottom { display: flex; align-items: center; gap: 24px; }
   #lensReplay {
@@ -129,9 +130,10 @@
     <span id="lensCount"></span>
   </div>
   <div id="lensStage"></div>
+  <div id="lensNote"></div>
   <div id="lensBottom">
     <button id="lensReplay" type="button">Replay</button>
-    <div id="lensHint">← → next word<br>↑ back to phrases</div>
+    <div id="lensHint">← → next letter<br>↑ back to phrases</div>
   </div>
 </div>
 
@@ -159,8 +161,8 @@
   var pack = null;
   var ctrl = null;
   var words = [];
-  var wordIndex = 0;
-  var speed = params.get('speed') === 'slow' ? 0.55 : 1;
+  var unitIndex = 0;
+  var speed = params.get('speed') === 'slow' ? 0.55 : (glasses ? 0.7 : 1);
   $('slow').setAttribute('aria-pressed', speed < 1 ? 'true' : 'false');
 
   function status(msg) { $('status').textContent = msg; }
@@ -207,25 +209,34 @@
     ctrl.play({ speed: speed });
   }
 
-  function renderLensWord() {
+  // On the glasses each syllable gets its own screen, so it stays large and learners can follow.
+  function lensUnits() {
+    var out = [];
+    words.forEach(function (w, wi) {
+      w.tokens.forEach(function (t) { out.push({ word: w.text, wi: wi, tok: t }); });
+    });
+    return out;
+  }
+
+  function renderLensUnit() {
     if (!pack) { return; }
     words = Sulat.syllabify(input.value);
-    if (!words.length) { return; }
-    wordIndex = (wordIndex + words.length) % words.length;
-    var w = words[wordIndex];
-    $('lensWord').textContent = w.text;
-    $('lensCount').textContent = words.length > 1 ? (wordIndex + 1) + ' / ' + words.length : '';
-    var lay = Sulat.layout(pack, [w], { pad: 60 });
-    var c = null;
-    c = Sulat.render($('lensStage'), pack, lay, {
+    var units = lensUnits();
+    if (!units.length) { return; }
+    unitIndex = (unitIndex + units.length) % units.length;
+    var u = units[unitIndex];
+    $('lensWord').textContent = u.word;
+    $('lensCount').textContent = (unitIndex + 1) + ' / ' + units.length;
+    $('lensNote').textContent = Sulat.describe(u.tok);
+    var lay = Sulat.layout(pack, [{ text: u.tok.text, tokens: [u.tok] }], { pad: 90 });
+    var lensInk = Math.max(26, Math.min(60, lay.viewBox[2] / 80));
+    ctrl = Sulat.render($('lensStage'), pack, lay, {
       labels: true,
-      labelSize: 90,
-      ink: 26,
-      dotInk: 38,
-      ariaLabel: w.text + ' in Baybayin',
-      onGlyph: highlighter(function () { return c ? c.labels : []; })
+      labelSize: 150,
+      ink: lensInk,
+      dotInk: lensInk * 1.3,
+      ariaLabel: u.tok.text + ' in Baybayin'
     });
-    ctrl = c;
     ctrl.play({ speed: speed });
     $('lensReplay').focus();
   }
@@ -266,8 +277,8 @@
   document.addEventListener('keydown', function (e) {
     if (e.target === input) { return; }
     if (glasses) {
-      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); wordIndex += 1; renderLensWord(); }
-      else if (e.key === 'ArrowLeft') { e.preventDefault(); wordIndex -= 1; renderLensWord(); }
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); unitIndex += 1; renderLensUnit(); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); unitIndex -= 1; renderLensUnit(); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); go('index.html'); }
       else if ((e.key === 'Enter' || e.key === ' ') && e.target !== $('lensReplay')) { e.preventDefault(); replay(); }
     } else if (e.key === 'Enter' && e.target === document.body) {
@@ -278,7 +289,7 @@
 
   Sulat.loadPack('packs/baybayin.json').then(function (p) {
     pack = p;
-    if (glasses) { renderLensWord(); } else { renderPhrase(); }
+    if (glasses) { renderLensUnit(); } else { renderPhrase(); }
   }).catch(function (err) {
     var msg = 'Couldn’t load packs/baybayin.json. Open this page from your Sulat site, not as a local file. (' + err.message + ')';
     if (glasses) { $('lensWord').textContent = msg; } else { status(msg); }
