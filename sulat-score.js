@@ -85,16 +85,35 @@
     return dy > 0 ? 'the top' : 'the bottom';
   }
 
+  // Real pen and finger input is a little jittery. Left alone, that jitter makes a stroke look longer
+  // than it is and throws off the point-by-point comparison, so smooth each stroke first (ends stay put).
+  function clean(pts) {
+    var out = [pts[0]];
+    for (var i = 1; i < pts.length; i++) { if (dist(pts[i], out[out.length - 1]) >= 3) { out.push(pts[i]); } }
+    if (out.length === 1 && pts.length > 1) { out.push(pts[pts.length - 1]); }
+    for (var pass = 0; pass < 3; pass++) {
+      var q = out.slice();
+      for (var k = 1; k < out.length - 1; k++) {
+        q[k] = { x: (out[k - 1].x + out[k].x + out[k + 1].x) / 3, y: (out[k - 1].y + out[k].y + out[k + 1].y) / 3 };
+      }
+      out = q;
+    }
+    return out;
+  }
+
   function score(ref, user, opts) {
     opts = opts || {};
-    var passT = opts.pass != null ? opts.pass : 0.14;
-    var closeT = opts.close != null ? opts.close : 0.22;
     var memory = opts.mode === 'memory';
+    // How far a stroke may stray, as a fraction of the glyph's size. Tracing is measured against the
+    // guide itself; from memory, size and position are forgiven but the shape must hold.
+    var LIM = memory ? { mean: 0.09, p90: 0.15, minLen: 0.75 } : { mean: 0.075, p90: 0.15, minLen: 0 };
+    var TIP = memory ? 0.065 : 0.055;
     var n = ref.length;
 
     if (!user.length) {
       return { pass: false, issue: 'empty', message: 'Draw it first, then check.' };
     }
+    user = user.map(function (st) { return { pts: clean(st.pts) }; });
 
     // 1. Stroke count
     if (user.length !== n) {
@@ -109,12 +128,14 @@
       return { pass: false, issue: 'count', expected: n, got: user.length, message: msg };
     }
 
-    // Align the learner's attempt with the reference: same centre, same overall size.
+    // From memory: line the attempt up with the reference (same centre, same overall size), so only
+    // the shape is judged. Tracing: no alignment, because the guide is right there on the screen.
     var R = bbox(ref), U = bbox(user);
-    var s = R.size / U.size;
-    function T(p) { return { x: (p.x - U.cx) * s + R.cx, y: (p.y - U.cy) * s + R.cy }; }
+    var s = memory ? R.size / U.size : 1;
+    var ucx = memory ? U.cx : R.cx, ucy = memory ? U.cy : R.cy;
+    function T(p) { return { x: (p.x - ucx) * s + R.cx, y: (p.y - ucy) * s + R.cy }; }
     var userN = user.map(function (st) { return { pts: st.pts.map(T) }; });
-    var transform = { s: s, ux: U.cx, uy: U.cy, rx: R.cx, ry: R.cy };
+    var transform = { s: s, ux: ucx, uy: ucy, rx: R.cx, ry: R.cy };
 
     // 2. Vowel mark on the correct side (this changes the sound, so it comes first)
     var k = opts.markStrokes || 0;
@@ -147,14 +168,36 @@
     var uu = userN.map(function (st) { return resample(st.pts, N); });
     var rlen = ref.map(function (st) { return pathLen(st.pts) / R.size; });
 
+    // Per-stroke measurements, in either direction of travel.
+    function distances(a, b) {
+      var d = [];
+      for (var q = 0; q < a.length; q++) { d.push(dist(a[q], b[q])); }
+      return d;
+    }
+    function avg(d) { var t = 0; for (var q = 0; q < d.length; q++) { t += d[q]; } return t / d.length; }
+    function p90(d) { var c = d.slice().sort(function (x, y) { return x - y; }); return c[Math.floor(0.9 * (c.length - 1))]; }
+    function smooth3(p) {
+      return p.map(function (pt, q) {
+        var a = p[Math.max(0, q - 1)], c = p[Math.min(p.length - 1, q + 1)];
+        return { x: (a.x + pt.x + c.x) / 3, y: (a.y + pt.y + c.y) / 3 };
+      });
+    }
+    function lenOf(p) { return pathLen(smooth3(smooth3(p))); }
+    function stat(a, b) {
+      var f = distances(a, b), r = distances(a, b.slice().reverse());
+      var forward = avg(f) <= avg(r);
+      var d = forward ? f : r;
+      return { mean: avg(d) / R.size, p90: p90(d) / R.size, reversed: !forward, meanF: avg(f) / R.size, meanR: avg(r) / R.size };
+    }
+
     // 3. Stroke order: does a learner stroke match a different reference stroke much better?
     for (var i = 0; i < n; i++) {
       if (rlen[i] < 0.12) { continue; } // tiny strokes and dots: order doesn't matter much
-      var own = Math.min(meanDist(uu[i], rr[i]), meanDist(uu[i].slice().reverse(), rr[i]));
+      var own = stat(rr[i], uu[i]).mean;
       for (var j = 0; j < n; j++) {
         if (j === i || rlen[j] < 0.12) { continue; }
-        var other = Math.min(meanDist(uu[i], rr[j]), meanDist(uu[i].slice().reverse(), rr[j]));
-        if (other < own * 0.6 && own / R.size > passT) {
+        var other = stat(rr[j], uu[i]).mean;
+        if (other < own * 0.6 && own > LIM.mean * 0.8) {
           return {
             pass: false, issue: 'order', transform: transform,
             message: memory
@@ -166,32 +209,57 @@
     }
 
     // 4. Direction, then 5. shape
-    var errors = [];
-    var worst = 0, worstI = 0;
+    var errors = [], load = [];
+    var worst = 0, worstI = 0, offGuide = false;
     for (var m = 0; m < n; m++) {
-      var fwd = meanDist(uu[m], rr[m]) / R.size;
-      var rev = meanDist(uu[m].slice().reverse(), rr[m]) / R.size;
-      var dot = ref[m].pts.length < 2 || rlen[m] < 0.03;
-      if (!dot && fwd > passT && rev < fwd * 0.6) {
+      var isDot = ref[m].pts.length < 2 || rlen[m] < 0.03;
+      if (isDot) {
+        // A dot or tiny mark: the side check above covers memory mode; when tracing it must sit on the guide.
+        var rc = centroid([ref[m]]), uc = centroid([userN[m]]);
+        var off = dist(rc, uc) / R.size;
+        errors.push(off); load.push(memory ? 0 : off / 0.12);
+        if (load[m] > worst) { worst = load[m]; worstI = m; }
+        continue;
+      }
+      var st = stat(rr[m], uu[m]);
+      if (st.meanF > LIM.mean * 0.8 && st.meanR < st.meanF * 0.6) {
         return {
           pass: false, issue: 'direction', stroke: m, transform: transform,
           message: 'Stroke ' + (m + 1) + ' goes the other way. Start it from ' + startWord(ref[m].pts) + '.'
         };
       }
-      errors.push(fwd);
-      if (fwd > worst) { worst = fwd; worstI = m; }
+      var lenRatio = lenOf(uu[m]) / lenOf(rr[m]);
+      var e = Math.max(st.mean / LIM.mean, st.p90 / LIM.p90, LIM.minLen && lenRatio < LIM.minLen ? 1.5 : 0);
+      errors.push(st.mean);
+      load.push(e);
+      if (e > worst) { worst = e; worstI = m; }
+      if (!memory && e > 1) {
+        // Right shape but away from the guide? Check it again after lining the stroke up.
+        var al = stat(rr[m], resample(userN[m].pts.map(function (p) {
+          var cu = bbox([{ pts: userN[m].pts }]), cr = bbox([ref[m]]);
+          return { x: p.x - cu.cx + cr.cx, y: p.y - cu.cy + cr.cy };
+        }), N));
+        if (al.mean < LIM.mean * 0.6 && al.p90 < LIM.p90 * 0.8) { offGuide = true; }
+      }
     }
     var mean = errors.reduce(function (a, b) { return a + b; }, 0) / n;
-    var strokes = errors.map(function (e, idx) { return { index: idx, error: Math.round(e * 1000) / 1000 }; });
+    var strokes = errors.map(function (e2, idx) { return { index: idx, error: Math.round(e2 * 1000) / 1000, load: Math.round(load[idx] * 100) / 100 }; });
 
-    if (worst > closeT) {
+    if (worst > 1) {
+      var which = 'Stroke ' + (worstI + 1);
+      if (offGuide) {
+        return {
+          pass: false, issue: 'offguide', stroke: worstI, error: mean, strokes: strokes, transform: transform,
+          message: which + ' has the right shape but sits off the guide. Trace right on top of it.'
+        };
+      }
       return {
         pass: false, issue: 'shape', stroke: worstI, error: mean, strokes: strokes, transform: transform,
-        message: 'Stroke ' + (worstI + 1) + ' drifts from the shape. ' +
+        message: which + ' drifts from the shape. ' +
           (memory ? 'Compare it with the guide, then try again.' : 'Trace closer to the guide and try again.')
       };
     }
-    if (worst > passT) {
+    if (worst > TIP / (memory ? LIM.mean : LIM.mean)) {
       return {
         pass: true, issue: 'close', stroke: worstI, error: mean, strokes: strokes, transform: transform,
         message: 'Looks right!',

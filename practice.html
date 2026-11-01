@@ -168,7 +168,7 @@
   var drawing = null;        // stroke in progress
   var checked = false;       // drawing is locked after Check until Try again
   var ctrl = null;           // Show me animation controller
-  var penSeen = false;
+  var lastPenAt = -99999;    // when the Pencil last touched, so a resting palm can be ignored
 
   var pad = $('pad');
   var ctx = pad.getContext('2d');
@@ -363,19 +363,26 @@
   function canDraw() { return (st.phase === 'trace' || st.phase === 'try') && !checked; }
 
   pad.addEventListener('pointerdown', function (e) {
-    if (!canDraw() || drawing) { return; }
-    if (e.pointerType === 'pen') { penSeen = true; }
-    if (e.pointerType === 'touch' && penSeen) { return; } // palm rejection once a Pencil is in use
+    if (!canDraw()) { return; }
+    var now = performance.now();
+    if (e.pointerType === 'pen') { lastPenAt = now; }
+    if (drawing) {
+      // A resting palm can start a stroke before the Pencil lands. The Pencil wins.
+      if (e.pointerType === 'pen' && drawing.type === 'touch') { drawing = null; } else { return; }
+    }
+    // Ignore touches only while the Pencil is in use, so a finger works again a moment later.
+    if (e.pointerType === 'touch' && now - lastPenAt < 1200) { return; }
     if (e.pointerType === 'mouse' && e.button > 0) { return; }
     e.preventDefault();
     try { pad.setPointerCapture(e.pointerId); } catch (err) { /* not fatal */ }
-    drawing = { pid: e.pointerId, pts: [toGlyph(e)] };
+    drawing = { pid: e.pointerId, type: e.pointerType, pts: [toGlyph(e)] };
     redraw();
   });
 
   pad.addEventListener('pointermove', function (e) {
     if (!drawing || e.pointerId !== drawing.pid) { return; }
     e.preventDefault();
+    if (e.pointerType === 'pen') { lastPenAt = performance.now(); }
     var evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
     if (!evs.length) { evs = [e]; }
     for (var i = 0; i < evs.length; i++) {
@@ -664,7 +671,8 @@
       var r = pad.getBoundingClientRect();
       return { x: r.left + (p.x * map.k + map.ox) * (r.width / size), y: r.top + (p.y * map.k + map.oy) * (r.height / size) };
     },
-    resultsText: resultsText
+    resultsText: resultsText,
+    strokeCount: function () { return user.length; }
   };
 
   Sulat.loadPack('packs/baybayin.json').then(function (p) {
