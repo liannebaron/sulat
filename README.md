@@ -62,6 +62,8 @@ How it's built:
 - **With Claude (Anthropic):** the hello page, the stroke-capture page, the Sulat engine (`sulat-engine.js`), the Show me page, and the glyph review sheet.
 - **With Meta's Muse Code:** voice input: `functions/api/transcribe.js`, `functions/api/intent.js` and `talk.html`, plus fixes for starter-phrase matching, iPhone mic reconnection, and the reasoning-speed change.
 
+Platform note: Meta’s docs list camera and microphone as unsupported for Ray-Ban Display Web Apps (updated Aug 4, 2026). Sulat works within that: the phone captures speech and photos of paper, and the glasses display the lesson.
+
 ## Stack
 
 - Meta Muse Spark 1.3: understanding the request with tool calling, and vision feedback on handwriting
