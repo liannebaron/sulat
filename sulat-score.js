@@ -269,5 +269,5 @@
     return { pass: true, issue: null, error: mean, strokes: strokes, transform: transform, message: 'Looks right!' };
   }
 
-  global.SulatScore = { score: score, resample: resample, bbox: bbox };
+  global.SulatScore = { score: score, resample: resample, bbox: bbox, version: 'strict-2' };
 })(typeof window !== 'undefined' ? window : this);

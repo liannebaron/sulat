@@ -107,6 +107,7 @@
       <button id="startBtn" type="button" class="primary">Start the lesson</button>
     </div>
     <p id="introStatus" role="status" style="color:var(--quiet)"></p>
+    <p id="scorerStamp" style="color:var(--quiet);font-size:13px;margin:6px 0 0"></p>
   </section>
 
   <section class="card" id="lessonCard" hidden>
@@ -143,8 +144,8 @@
   </section>
 </div>
 
-<script src="sulat-engine.js"></script>
-<script src="sulat-score.js"></script>
+<script src="sulat-engine.js?v=3"></script>
+<script src="sulat-score.js?v=strict-2"></script>
 <script>
 (function () {
   'use strict';
@@ -674,6 +675,8 @@
     resultsText: resultsText,
     strokeCount: function () { return user.length; }
   };
+
+  $('scorerStamp').textContent = 'Scorer: ' + (SulatScore.version || 'OLD version, upload sulat-score.js again');
 
   Sulat.loadPack('packs/baybayin.json').then(function (p) {
     pack = p;
