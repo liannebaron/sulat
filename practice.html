@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sulat · Practice</title>
+<style>
+  :root {
+    --page: #eceff3;
+    --card: #ffffff;
+    --ink: #14161a;
+    --quiet: #5d6572;
+    --line: #d9dde3;
+    --accent: #1f3a8a;
+    --good: #1f7a4d;
+    --warn: #9a3b12;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; overscroll-behavior: none; }
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 16px;
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+  }
+  h1 { margin: 4px 0 2px; font: 400 30px Georgia, "Times New Roman", serif; }
+  h2 { margin: 0 0 8px; font: 400 24px Georgia, "Times New Roman", serif; }
+  .lede { margin: 0 0 16px; color: var(--quiet); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .between { justify-content: space-between; }
+  button {
+    font: inherit;
+    min-height: 48px;
+    padding: 0 18px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--accent); border-color: var(--accent); }
+  button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  input[type="text"] { min-height: 44px; padding: 0 12px; font: inherit; border: 1px solid var(--line); border-radius: 10px; width: 100%; max-width: 280px; }
+  label.field { display: block; margin: 14px 0 6px; color: var(--quiet); }
+  #phraseView svg { display: block; width: 100%; height: auto; max-height: 190px; color: var(--ink); }
+  #phraseView .label { fill: var(--quiet); }
+  #phraseLine { font: 22px Georgia, "Times New Roman", serif; margin: 10px 0 4px; }
+  #sylList { margin: 6px 0 0; padding-left: 20px; color: var(--quiet); }
+  #where { color: var(--quiet); }
+  #phaseName { font-weight: 600; color: var(--accent); }
+  #cue { text-align: center; margin: 6px 0 10px; }
+  #cueBig { font: 56px Georgia, "Times New Roman", serif; line-height: 1.1; }
+  #cueSmall { color: var(--quiet); margin-top: 4px; min-height: 1.4em; }
+  .stagebox {
+    position: relative;
+    width: 100%;
+    max-width: 520px;
+    margin: 0 auto;
+    aspect-ratio: 1 / 1;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  #show { position: absolute; inset: 0; pointer-events: none; color: var(--ink); }
+  #show svg { display: block; width: 100%; height: 100%; }
+  #pad {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  }
+  #feedback { min-height: 1.5em; margin: 12px 0 2px; font-size: 18px; text-align: center; }
+  #feedback.good { color: var(--good); font-weight: 600; }
+  #feedback.bad { color: var(--warn); }
+  #tip { min-height: 1.3em; margin: 0 0 10px; color: var(--quiet); text-align: center; }
+  #actions { justify-content: center; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 12px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+  th { color: var(--quiet); font-weight: 500; }
+  .ok { color: var(--good); }
+  .no { color: var(--warn); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Practice</h1>
+  <p class="lede">Learn to write a phrase in Baybayin: watch it, trace it, then write it from memory.</p>
+
+  <section class="card" id="introCard">
+    <div class="row" id="phrases"></div>
+    <div id="phraseView" style="margin-top:14px"></div>
+    <p id="phraseLine"></p>
+    <ol id="sylList"></ol>
+    <label class="field" for="learner">Learner (optional, for your notes)</label>
+    <input id="learner" type="text" autocomplete="off" placeholder="Name or initials">
+    <div class="row" style="margin-top:14px">
+      <button id="startBtn" type="button" class="primary">Start the lesson</button>
+    </div>
+    <p id="introStatus" role="status" style="color:var(--quiet)"></p>
+  </section>
+
+  <section class="card" id="lessonCard" hidden>
+    <div class="row between">
+      <span id="where"></span>
+      <span id="phaseName"></span>
+    </div>
+    <div id="cue">
+      <div id="cueBig"></div>
+      <div id="cueSmall"></div>
+    </div>
+    <div class="stagebox">
+      <canvas id="pad" aria-label="Writing area"></canvas>
+      <div id="show"></div>
+    </div>
+    <p id="feedback" role="status" aria-live="polite"></p>
+    <p id="tip"></p>
+    <div class="row" id="actions"></div>
+  </section>
+
+  <section class="card" id="doneCard" hidden>
+    <h2 id="doneTitle"></h2>
+    <p id="summary"></p>
+    <table>
+      <thead><tr><th>Syllable</th><th>Tracing</th><th>From memory</th></tr></thead>
+      <tbody id="results"></tbody>
+    </table>
+    <div class="row">
+      <button id="again" type="button" class="primary">Practice again</button>
+      <button id="copy" type="button">Copy results</button>
+      <button id="other" type="button">Choose another phrase</button>
+    </div>
+    <p id="copyStatus" role="status" style="color:var(--quiet)"></p>
+  </section>
+</div>
+
+<script src="sulat-engine.js"></script>
+<script src="sulat-score.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var STARTERS = [
+    { text: 'mahal kita', en: 'I love you' },
+    { text: 'salamat', en: 'thank you' },
+    { text: 'kumusta', en: 'how are you' },
+    { text: 'magandang umaga', en: 'good morning' },
+    { text: 'paalam', en: 'goodbye' }
+  ];
+  var SPEED = 0.75;          // a little slower than Show me, for learners
+  var INK = 24;              // stroke width in glyph units
+  var $ = function (id) { return document.getElementById(id); };
+  var params = new URLSearchParams(window.location.search);
+
+  var pack = null;
+  var st = { text: params.get('text') || 'mahal kita', tokens: [], idx: 0, phase: 'intro', results: [], learner: '' };
+  var cur = null;            // the syllable being taught
+  var user = [];             // learner strokes, in glyph units
+  var drawing = null;        // stroke in progress
+  var checked = false;       // drawing is locked after Check until Try again
+  var ctrl = null;           // Show me animation controller
+  var penSeen = false;
+
+  var pad = $('pad');
+  var ctx = pad.getContext('2d');
+  var size = 0, dpr = 1;
+  var map = { k: 1, ox: 0, oy: 0 };
+
+  function englishFor(text) {
+    var t = Sulat.normalize(text);
+    for (var i = 0; i < STARTERS.length; i++) { if (STARTERS[i].text === t) { return STARTERS[i].en; } }
+    return '';
+  }
+
+  /* ---------- geometry ---------- */
+
+  // Smooth the stored anchor points the same way the drawing path does.
+  function dense(points) {
+    if (points.length === 1) { return [{ x: points[0][0], y: points[0][1] }]; }
+    var out = [];
+    for (var i = 0; i < points.length - 1; i++) {
+      var p0 = points[i - 1] || points[i], p1 = points[i], p2 = points[i + 1], p3 = points[i + 2] || points[i + 1];
+      var c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+      var c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+      for (var k = 0; k < 10; k++) {
+        var t = k / 10, a = (1 - t) * (1 - t) * (1 - t), b = 3 * (1 - t) * (1 - t) * t, c = 3 * (1 - t) * t * t, d = t * t * t;
+        out.push({ x: a * p1[0] + b * c1[0] + c * c2[0] + d * p2[0], y: a * p1[1] + b * c1[1] + c * c2[1] + d * p2[1] });
+      }
+    }
+    var last = points[points.length - 1];
+    out.push({ x: last[0], y: last[1] });
+    return out;
+  }
+
+  function buildSyllable(tok) {
+    var lay = Sulat.layout(pack, [{ text: tok.text, tokens: [tok] }], { pad: 110 });
+    var it = lay.items[0];
+    var strokes = [];
+    function add(s, dx, dy) {
+      strokes.push({
+        path: s.path, dx: dx, dy: dy, dot: s.kind === 'dot',
+        pts: dense(s.points).map(function (p) { return { x: p.x + dx, y: p.y + dy }; })
+      });
+    }
+    pack.glyphs[it.base].strokes.forEach(function (s) { add(s, it.dx, it.dy); });
+    var opts = { markStrokes: 0, markSide: null, markKind: 'dot' };
+    if (it.mark) {
+      var mg = pack.glyphs[it.mark.id];
+      mg.strokes.forEach(function (s) { add(s, it.mark.dx, it.mark.dy); });
+      opts.markStrokes = mg.strokes.length;
+      opts.markSide = it.mark.id === 'mark-i' ? 'above' : 'below';
+      opts.markKind = it.mark.id === 'mark-virama' ? 'cross' : 'dot';
+    }
+    return { tok: tok, lay: lay, strokes: strokes, opts: opts };
+  }
+
+  function resize() {
+    var r = pad.getBoundingClientRect();
+    if (!r.width) { return; }
+    dpr = window.devicePixelRatio || 1;
+    size = r.width;
+    pad.width = Math.round(size * dpr);
+    pad.height = Math.round(size * dpr);
+    computeMap();
+    redraw();
+  }
+
+  function computeMap() {
+    if (!cur || !size) { return; }
+    var vb = cur.lay.viewBox;
+    var k = Math.min(size / vb[2], size / vb[3]);
+    map = { k: k, ox: (size - vb[2] * k) / 2 - vb[0] * k, oy: (size - vb[3] * k) / 2 - vb[1] * k };
+  }
+
+  function toGlyph(e) {
+    var r = pad.getBoundingClientRect();
+    var X = (e.clientX - r.left) * (size / r.width);
+    var Y = (e.clientY - r.top) * (size / r.height);
+    return { x: (X - map.ox) / map.k, y: (Y - map.oy) / map.k };
+  }
+
+  /* ---------- drawing ---------- */
+
+  function withGlyphSpace(fn) {
+    ctx.save();
+    ctx.setTransform(dpr * map.k, 0, 0, dpr * map.k, dpr * map.ox, dpr * map.oy);
+    fn();
+    ctx.restore();
+  }
+
+  function drawRef(color, tf) {
+    // tf maps the reference into the learner's own position and size (for the ghost reveal).
+    var sc = 1, tx = 0, ty = 0;
+    if (tf) { sc = 1 / tf.s; tx = tf.ux - tf.rx / tf.s; ty = tf.uy - tf.ry / tf.s; }
+    ctx.save();
+    ctx.setTransform(dpr * map.k * sc, 0, 0, dpr * map.k * sc, dpr * (map.ox + map.k * tx), dpr * (map.oy + map.k * ty));
+    ctx.strokeStyle = color;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    cur.strokes.forEach(function (s) {
+      ctx.save();
+      ctx.translate(s.dx, s.dy);
+      ctx.lineWidth = (s.dot ? 34 : INK) * (tf ? tf.s : 1);
+      ctx.stroke(new Path2D(s.path));
+      ctx.restore();
+    });
+    ctx.restore();
+  }
+
+  function pointAlong(pts, d) {
+    var acc = 0;
+    for (var i = 1; i < pts.length; i++) {
+      var seg = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+      if (acc + seg >= d) {
+        var t = (d - acc) / seg;
+        return { x: pts[i - 1].x + t * (pts[i].x - pts[i - 1].x), y: pts[i - 1].y + t * (pts[i].y - pts[i - 1].y) };
+      }
+      acc += seg;
+    }
+    return pts[pts.length - 1];
+  }
+
+  function drawMarkers() {
+    withGlyphSpace(function () {
+      var placed = [];
+      cur.strokes.forEach(function (s, i) {
+        var p = s.pts[0];
+        if (!s.dot && s.pts.length > 3) {
+          // a short arrow showing which way the stroke starts
+          var q = pointAlong(s.pts, 80);
+          var ang = Math.atan2(q.y - p.y, q.x - p.x);
+          ctx.strokeStyle = 'rgba(31,58,138,0.9)';
+          ctx.lineWidth = 7;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y);
+          ctx.moveTo(q.x, q.y); ctx.lineTo(q.x - 24 * Math.cos(ang - 0.5), q.y - 24 * Math.sin(ang - 0.5));
+          ctx.moveTo(q.x, q.y); ctx.lineTo(q.x - 24 * Math.cos(ang + 0.5), q.y - 24 * Math.sin(ang + 0.5));
+          ctx.stroke();
+        }
+        var mx = p.x - 38, my = p.y - 38;
+        for (var tries = 0; tries < 6; tries++) {
+          var clash = placed.some(function (o) { return Math.abs(o.x - mx) < 44 && Math.abs(o.y - my) < 44; });
+          if (!clash) { break; }
+          mx -= 44;
+        }
+        placed.push({ x: mx, y: my });
+        ctx.fillStyle = 'rgba(31,58,138,0.95)';
+        ctx.beginPath(); ctx.arc(mx, my, 21, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 24px -apple-system, Helvetica, Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(i + 1), mx, my + 1);
+      });
+    });
+  }
+
+  function drawStroke(pts) {
+    if (pts.length === 1) {
+      ctx.beginPath(); ctx.arc(pts[0].x, pts[0].y, 17, 0, Math.PI * 2); ctx.fill();
+      return;
+    }
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (var i = 1; i < pts.length; i++) { ctx.lineTo(pts[i].x, pts[i].y); }
+    ctx.stroke();
+  }
+
+  function drawUser() {
+    withGlyphSpace(function () {
+      ctx.strokeStyle = '#14161a';
+      ctx.fillStyle = '#14161a';
+      ctx.lineWidth = INK;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      user.forEach(function (s) { drawStroke(s.pts); });
+      if (drawing) { drawStroke(drawing.pts); }
+    });
+  }
+
+  var ghost = null;
+  function redraw() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, size, size);
+    if (!cur) { return; }
+    if (st.phase === 'trace') { drawRef('#d3d8df'); drawMarkers(); }
+    drawUser();
+    if (ghost) { drawRef('rgba(31,58,138,0.38)', ghost); }
+  }
+
+  /* ---------- pointer input ---------- */
+
+  function canDraw() { return (st.phase === 'trace' || st.phase === 'try') && !checked; }
+
+  pad.addEventListener('pointerdown', function (e) {
+    if (!canDraw() || drawing) { return; }
+    if (e.pointerType === 'pen') { penSeen = true; }
+    if (e.pointerType === 'touch' && penSeen) { return; } // palm rejection once a Pencil is in use
+    if (e.pointerType === 'mouse' && e.button > 0) { return; }
+    e.preventDefault();
+    try { pad.setPointerCapture(e.pointerId); } catch (err) { /* not fatal */ }
+    drawing = { pid: e.pointerId, pts: [toGlyph(e)] };
+    redraw();
+  });
+
+  pad.addEventListener('pointermove', function (e) {
+    if (!drawing || e.pointerId !== drawing.pid) { return; }
+    e.preventDefault();
+    var evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    if (!evs.length) { evs = [e]; }
+    for (var i = 0; i < evs.length; i++) {
+      var p = toGlyph(evs[i]);
+      var last = drawing.pts[drawing.pts.length - 1];
+      if (Math.hypot(p.x - last.x, p.y - last.y) < 2) { continue; }
+      drawing.pts.push(p);
+    }
+    redraw();
+  });
+
+  function finish(e) {
+    if (!drawing || (e && e.pointerId !== drawing.pid)) { return; }
+    user.push({ pts: drawing.pts });
+    drawing = null;
+    redraw();
+  }
+  pad.addEventListener('pointerup', finish);
+  pad.addEventListener('pointercancel', finish);
+  pad.addEventListener('lostpointercapture', finish);
+  window.addEventListener('pointerup', finish);
+  pad.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+  /* ---------- lesson flow ---------- */
+
+  function setActions(list) {
+    var host = $('actions');
+    host.innerHTML = '';
+    list.forEach(function (b) {
+      var el = document.createElement('button');
+      el.type = 'button';
+      el.textContent = b.label;
+      if (b.primary) { el.className = 'primary'; }
+      el.addEventListener('click', b.fn);
+      host.appendChild(el);
+    });
+  }
+
+  function say(text, kind, tip) {
+    var f = $('feedback');
+    f.textContent = text || '';
+    f.className = kind || '';
+    $('tip').textContent = tip || '';
+  }
+
+  function header(phaseName) {
+    $('where').textContent = 'Syllable ' + (st.idx + 1) + ' of ' + st.tokens.length;
+    $('phaseName').textContent = phaseName;
+  }
+
+  function showSvg(on) { $('show').hidden = !on; }
+
+  function goShow() {
+    st.phase = 'show';
+    cur = buildSyllable(st.tokens[st.idx]);
+    computeMap();
+    user = []; drawing = null; checked = false; ghost = null;
+    header('Show me');
+    $('cueBig').textContent = cur.tok.text;
+    $('cueSmall').textContent = Sulat.describe(cur.tok);
+    showSvg(true);
+    redraw();
+    ctrl = Sulat.render($('show'), pack, cur.lay, { ink: INK, dotInk: 34, ariaLabel: cur.tok.text + ' in Baybayin' });
+    ctrl.play({ speed: SPEED });
+    say('Watch the order of the strokes.');
+    setActions([
+      { label: 'Replay', fn: function () { ctrl.play({ speed: SPEED }); } },
+      { label: 'Trace it →', primary: true, fn: goTrace }
+    ]);
+  }
+
+  function goTrace() {
+    if (ctrl) { ctrl.stop(); }
+    st.phase = 'trace';
+    user = []; drawing = null; checked = false; ghost = null;
+    header('Trace');
+    showSvg(false);
+    redraw();
+    say('Trace over the guide. Follow the numbers and arrows.');
+    setActions([
+      { label: 'Clear', fn: clearInk },
+      { label: 'Check', primary: true, fn: check }
+    ]);
+  }
+
+  function clearInk() {
+    user = []; drawing = null; checked = false; ghost = null;
+    redraw();
+    say(st.phase === 'try' ? 'Write “' + cur.tok.text + '” from memory.' : 'Trace over the guide. Follow the numbers and arrows.');
+    setActions([
+      { label: 'Clear', fn: clearInk },
+      { label: 'Check', primary: true, fn: check }
+    ]);
+  }
+
+  function alignedGhost() {
+    if (!user.length) { return null; }
+    var R = SulatScore.bbox(cur.strokes), U = SulatScore.bbox(user);
+    return { s: R.size / U.size, ux: U.cx, uy: U.cy, rx: R.cx, ry: R.cy };
+  }
+
+  function check() {
+    if (drawing) { finish(); }
+    var memory = st.phase === 'try';
+    var opts = { mode: memory ? 'memory' : 'trace' };
+    Object.keys(cur.opts).forEach(function (k) { opts[k] = cur.opts[k]; });
+    var res = SulatScore.score(cur.strokes, user, opts);
+    if (res.issue === 'empty') { say(res.message, 'bad'); return; }
+    checked = true;
+    var r = st.results[st.idx];
+    if (memory) {
+      r.tryAttempts += 1;
+      if (r.tryFirst === null) { r.tryFirst = res.pass; }
+      if (res.pass) { r.tryPassed = true; }
+      ghost = res.transform || alignedGhost();   // reveal the correct glyph over their attempt
+    } else {
+      r.traceAttempts += 1;
+      if (res.pass) { r.tracePassed = true; }
+    }
+    r.log.push({ phase: st.phase, pass: res.pass, issue: res.issue, at: Date.now() });
+    redraw();
+    say(res.message, res.pass ? 'good' : 'bad', res.pass ? (res.tip || '') : (memory ? 'The blue shows how it’s written.' : ''));
+    var last = st.idx === st.tokens.length - 1;
+    if (res.pass) {
+      setActions(memory
+        ? [{ label: last ? 'See results →' : 'Next →', primary: true, fn: next }]
+        : [{ label: 'Trace again', fn: goTrace }, { label: last ? 'Now from memory →' : 'Next →', primary: true, fn: next }]);
+    } else {
+      setActions(memory
+        ? [{ label: 'Try again', primary: true, fn: clearInk }, { label: last ? 'See results →' : 'Skip →', fn: next }]
+        : [{ label: 'Show me again', fn: goShow }, { label: 'Try again', primary: true, fn: clearInk }]);
+    }
+  }
+
+  function next() {
+    st.idx += 1;
+    if (st.phase === 'trace' || st.phase === 'show') {
+      if (st.idx < st.tokens.length) { goShow(); } else { goTryIntro(); }
+    } else if (st.idx < st.tokens.length) { goTry(); } else { goDone(); }
+  }
+
+  function goTryIntro() {
+    st.phase = 'tryIntro';
+    cur = null; user = []; ghost = null; checked = false;
+    showSvg(false);
+    redraw();
+    $('where').textContent = st.text;
+    $('phaseName').textContent = 'You try';
+    $('cueBig').textContent = 'From memory';
+    $('cueSmall').textContent = 'No guide this time. You’ll only see how each syllable sounds.';
+    say('');
+    setActions([{ label: 'Begin', primary: true, fn: function () { st.idx = 0; goTry(); } }]);
+  }
+
+  function goTry() {
+    st.phase = 'try';
+    cur = buildSyllable(st.tokens[st.idx]);
+    computeMap();
+    user = []; drawing = null; checked = false; ghost = null;
+    header('You try');
+    $('cueBig').textContent = cur.tok.text;
+    $('cueSmall').textContent = '';
+    showSvg(false);
+    redraw();
+    say('Write “' + cur.tok.text + '” from memory.');
+    setActions([
+      { label: 'Clear', fn: clearInk },
+      { label: 'Check', primary: true, fn: check }
+    ]);
+  }
+
+  function firstTryCount() {
+    return st.results.filter(function (r) { return r.tryFirst === true; }).length;
+  }
+
+  function resultsText() {
+    var n = st.results.length;
+    var lines = ['Sulat practice: ' + st.text + (st.learner ? ' (learner: ' + st.learner + ')' : '') + ', ' + new Date().toLocaleString()];
+    lines.push('From memory, right on the first try: ' + firstTryCount() + ' of ' + n);
+    st.results.forEach(function (r) {
+      var mem = r.tryFirst ? 'right first try' : (r.tryPassed ? 'right after ' + r.tryAttempts + ' tries' : 'not yet (' + r.tryAttempts + ' tries)');
+      lines.push('- ' + r.text + ': traced in ' + r.traceAttempts + (r.traceAttempts === 1 ? ' try' : ' tries') + '; from memory ' + mem);
+    });
+    return lines.join('\n');
+  }
+
+  function goDone() {
+    st.phase = 'done';
+    $('lessonCard').hidden = true;
+    $('doneCard').hidden = false;
+    var n = st.results.length, first = firstTryCount();
+    var all = st.results.every(function (r) { return r.tryPassed; });
+    $('doneTitle').textContent = all ? 'You wrote “' + st.text + '” from memory!' : 'Lesson complete';
+    $('summary').textContent = 'Right on the first try from memory: ' + first + ' of ' + n + ' syllables.';
+    var body = $('results');
+    body.innerHTML = '';
+    st.results.forEach(function (r) {
+      var tr = document.createElement('tr');
+      var mem = r.tryFirst ? '<span class="ok">first try</span>'
+        : (r.tryPassed ? '<span class="ok">after ' + r.tryAttempts + ' tries</span>' : '<span class="no">not yet</span>');
+      tr.innerHTML = '<td>' + r.text + '</td><td>' + r.traceAttempts + (r.traceAttempts === 1 ? ' try' : ' tries') + '</td><td>' + mem + '</td>';
+      body.appendChild(tr);
+    });
+    try {
+      var key = 'sulat.practice.sessions';
+      var all2 = JSON.parse(localStorage.getItem(key) || '[]');
+      all2.push({ text: st.text, learner: st.learner, at: new Date().toISOString(), results: st.results });
+      localStorage.setItem(key, JSON.stringify(all2));
+    } catch (e) { /* storage unavailable: the copy button still works */ }
+  }
+
+  function startLesson() {
+    st.learner = $('learner').value.trim();
+    st.idx = 0;
+    st.results = st.tokens.map(function (t) {
+      return { text: t.text, traceAttempts: 0, tracePassed: false, tryAttempts: 0, tryFirst: null, tryPassed: false, log: [] };
+    });
+    $('introCard').hidden = true;
+    $('doneCard').hidden = true;
+    $('lessonCard').hidden = false;
+    resize();
+    goShow();
+    resize();
+  }
+
+  /* ---------- intro ---------- */
+
+  function renderIntro() {
+    var words = Sulat.syllabify(st.text);
+    st.tokens = [];
+    words.forEach(function (w) { w.tokens.forEach(function (t) { st.tokens.push(t); }); });
+    var lay = Sulat.layout(pack, words);
+    var c = Sulat.render($('phraseView'), pack, lay, { labels: true, ariaLabel: st.text + ' in Baybayin' });
+    c.play({ speed: 1 });
+    var en = englishFor(st.text);
+    $('phraseLine').textContent = st.text + (en ? ' · ' + en : '');
+    var list = $('sylList');
+    list.innerHTML = '';
+    st.tokens.forEach(function (t) {
+      var li = document.createElement('li');
+      li.textContent = Sulat.describe(t);
+      list.appendChild(li);
+    });
+    var missing = lay.missing.length ? 'Missing from the stroke pack: ' + lay.missing.join(', ') : '';
+    $('introStatus').textContent = missing;
+    $('startBtn').disabled = !st.tokens.length || !!missing;
+    var chips = $('phrases').children;
+    for (var i = 0; i < chips.length; i++) {
+      chips[i].setAttribute('aria-pressed', chips[i].dataset.text === Sulat.normalize(st.text) ? 'true' : 'false');
+    }
+  }
+
+  STARTERS.forEach(function (s) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = s.text;
+    b.dataset.text = s.text;
+    b.addEventListener('click', function () { st.text = s.text; renderIntro(); });
+    $('phrases').appendChild(b);
+  });
+
+  $('startBtn').addEventListener('click', startLesson);
+  $('again').addEventListener('click', startLesson);
+  $('other').addEventListener('click', function () {
+    $('doneCard').hidden = true;
+    $('introCard').hidden = false;
+    st.phase = 'intro';
+    renderIntro();
+  });
+  $('copy').addEventListener('click', function () {
+    var text = resultsText();
+    function done(ok) { $('copyStatus').textContent = ok ? 'Copied. Paste it into your notes.' : 'Copy failed. Here it is:\n' + text; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
+    } else { done(false); }
+  });
+
+  window.addEventListener('resize', resize);
+  if ('ResizeObserver' in window) { new ResizeObserver(function () { resize(); }).observe(pad); }
+
+  // For automated tests and debugging only.
+  window.SulatPractice = {
+    state: st,
+    current: function () { return cur; },
+    toClient: function (p) {
+      var r = pad.getBoundingClientRect();
+      return { x: r.left + (p.x * map.k + map.ox) * (r.width / size), y: r.top + (p.y * map.k + map.oy) * (r.height / size) };
+    },
+    resultsText: resultsText
+  };
+
+  Sulat.loadPack('packs/baybayin.json').then(function (p) {
+    pack = p;
+    renderIntro();
+  }).catch(function (err) {
+    $('introStatus').textContent = 'Couldn’t load the stroke pack. Open this page from your Sulat site. (' + err.message + ')';
+    $('startBtn').disabled = true;
+  });
+})();
+</script>
+</body>
+</html>
