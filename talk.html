@@ -133,8 +133,9 @@
     'if(this.recording&&ch){this.port.postMessage(ch.slice(0));}return true;}}' +
     'registerProcessor("tap-recorder",TapRecorder);';
 
-  var stream = null, ctx = null, port = null;
-  var armed = false, arming = false;
+  var stream = null, ctx = null, sourceNode = null, workletNode = null, port = null;
+  var armed = false, arming = false, everArmed = false;
+  var pressActive = false, pendingHold = false;
   var recording = false, busy = false;
   var chunks = [], holdTimer = 0;
   var lastMs = { transcribe: null, intent: null };
@@ -149,20 +150,43 @@
     talk.textContent = 'Hold to talk';
   }
 
-  function disarm() {
-    armed = false;
-    stream = null;
-    talk.textContent = 'Tap to allow the microphone';
+  function streamAlive() {
+    return !!stream && stream.getAudioTracks().some(function (t) { return t.readyState === 'live'; });
   }
 
-  // First tap: permission only. The stream stays open so later holds record instantly.
-  function arm() {
-    if (armed || arming) { return Promise.resolve(armed); }
-    arming = true;
-    say('Requesting the microphone\u2026');
-    var p = Promise.resolve();
+  function watchTracks() {
+    stream.getTracks().forEach(function (t) { t.onended = onTrackEnded; });
+  }
+
+  // iPhone Safari stops the mic track after a few recordings. Keep everything
+  // else in place so the next press reconnects silently; only a real
+  // permission denial shows an error.
+  function onTrackEnded() {
+    stream = null;
+    say('The microphone turned off. Press and hold to reconnect.');
+  }
+
+  function attachSource() {
+    if (sourceNode) {
+      try { sourceNode.disconnect(); } catch (e) { /* already gone */ }
+      sourceNode = null;
+    }
+    sourceNode = ctx.createMediaStreamSource(stream);
+    if (!workletNode) {
+      workletNode = new AudioWorkletNode(ctx, 'tap-recorder');
+      port = workletNode.port;
+      port.onmessage = function (e) { if (recording) { chunks.push(e.data); } };
+      // Keep the graph alive without making a sound.
+      var hush = ctx.createGain();
+      hush.gain.value = 0;
+      workletNode.connect(hush);
+      hush.connect(ctx.destination);
+    }
+    sourceNode.connect(workletNode);
+  }
+
+  function connect() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      arming = false;
       say('This browser cannot record audio. Try iPhone Safari or Chrome.', true);
       return Promise.resolve(false);
     }
@@ -170,51 +194,103 @@
       audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 }
     }).then(function (s) {
       stream = s;
-      var AC = window.AudioContext || window.webkitAudioContext;
-      if (!AC) { throw new Error('no-audio-context'); }
-      ctx = new AC();
+      watchTracks();
+      if (!ctx) {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) { throw new Error('no-audio-context'); }
+        ctx = new AC();
+      }
       var ready = ctx.resume ? ctx.resume().catch(function () {}) : Promise.resolve();
       return ready.then(function () {
+        if (workletNode) {
+          attachSource();
+          return true;
+        }
         var url = URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }));
         return ctx.audioWorklet.addModule(url).then(function () {
           URL.revokeObjectURL(url);
-          var source = ctx.createMediaStreamSource(stream);
-          var node = new AudioWorkletNode(ctx, 'tap-recorder');
-          port = node.port;
-          port.onmessage = function (e) { if (recording) { chunks.push(e.data); } };
-          source.connect(node);
-          // Keep the graph alive without making a sound.
-          var hush = ctx.createGain();
-          hush.gain.value = 0;
-          node.connect(hush);
-          hush.connect(ctx.destination);
-          stream.getTracks().forEach(function (t) {
-            t.onended = function () { disarm(); say('The microphone turned off. Tap to allow it again.'); };
-          });
-          armed = true;
-          talk.textContent = 'Hold to talk';
-          say('Microphone ready. Hold the button and ask.');
-          hint.textContent = 'Hold while you speak, release to send.';
+          attachSource();
+          return true;
         });
       });
+    }).then(function (ok) {
+      if (ok) {
+        armed = true;
+        everArmed = true;
+        talk.textContent = 'Hold to talk';
+      }
+      return ok;
     }).catch(function (err) {
       if (err && err.name === 'NotAllowedError') {
-        say('Microphone access was denied. Allow it in Safari (aA \u2192 Website Settings \u2192 Microphone), then tap again.', true);
+        say('Microphone access was denied. Allow it in Safari (aA \u2192 Website Settings \u2192 Microphone), then press again.', true);
       } else if (err && err.name === 'NotFoundError') {
         say('No microphone was found on this device.', true);
       } else {
-        say('Could not start the microphone. Tap to try again.', true);
+        say('Could not start the microphone. Press to try again.', true);
       }
       stream = null;
       return false;
-    }).then(function (ok) {
-      arming = false;
-      return ok === true && armed;
     });
   }
 
+  // First tap: permission only, never records. The stream stays open so later
+  // holds start recording instantly.
+  function arm() {
+    if (armed || arming) { return Promise.resolve(armed); }
+    arming = true;
+    say('Requesting the microphone\u2026');
+    return connect().then(function (ok) {
+      arming = false;
+      if (ok) {
+        say('Microphone ready. Hold the button and ask.');
+        hint.textContent = 'Hold while you speak, release to send.';
+      }
+      return ok;
+    });
+  }
+
+  // Later presses when the track died: reconnect silently, then record this
+  // same press if the finger is still down.
+  function reconnect() {
+    arming = true;
+    say('Reconnecting the microphone\u2026');
+    return connect().then(function (ok) {
+      arming = false;
+      var take = pendingHold;
+      pendingHold = false;
+      if (ok && take && pressActive && streamAlive()) {
+        beginHold();
+      } else if (ok) {
+        say('Microphone ready. Hold the button and ask.');
+      }
+      return ok;
+    });
+  }
+
+  function pressDown() {
+    pressActive = true;
+    if (!everArmed) {
+      arm();
+      return;
+    }
+    if (busy) { return; }
+    pendingHold = true;
+    if (streamAlive()) {
+      pendingHold = false;
+      beginHold();
+    } else if (!arming) {
+      reconnect();
+    }
+  }
+
+  function pressUp() {
+    pressActive = false;
+    pendingHold = false;
+    endHold();
+  }
+
   function beginHold() {
-    if (!armed || busy) { return; }
+    if (!armed || !streamAlive() || busy) { return; }
     if (ctx && ctx.state === 'suspended' && ctx.resume) { ctx.resume().catch(function () {}); }
     chunks = [];
     recording = true;
@@ -375,30 +451,25 @@
 
   talk.addEventListener('pointerdown', function (e) {
     e.preventDefault();
-    if (!armed) {
-      arm();
-      return;
-    }
-    beginHold();
+    pressDown();
   });
   talk.addEventListener('pointerup', function (e) {
     e.preventDefault();
-    endHold();
+    pressUp();
   });
-  talk.addEventListener('pointercancel', endHold);
+  talk.addEventListener('pointercancel', pressUp);
   talk.addEventListener('lostpointercapture', function () { /* release handled by pointerup */ });
   talk.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   talk.addEventListener('keydown', function (e) {
     if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) {
       e.preventDefault();
-      if (!armed) { arm(); return; }
-      beginHold();
+      pressDown();
     }
   });
   talk.addEventListener('keyup', function (e) {
     if (e.key === ' ' || e.key === 'Enter') {
       e.preventDefault();
-      endHold();
+      pressUp();
     }
   });
 })();

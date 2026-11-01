@@ -99,6 +99,12 @@ export async function onRequestPost(context) {
     return Response.json({ error: 'The lesson service gave no answer. Try again.' }, { status: 502 });
   }
 
+  // Matches a starter ignoring case, punctuation and extra spaces,
+  // so "Mahal Kita!" or "  mahal   kita " still count as the starter.
+  function normalizeTagalog(s) {
+    return String(s || '').toLowerCase().replace(/[^a-z\s]/g, '').replace(/\s+/g, ' ').trim();
+  }
+
   var calls = msg.tool_calls || [];
   if (calls.length && calls[0].function) {
     var args = {};
@@ -107,12 +113,13 @@ export async function onRequestPost(context) {
     var english = String(args.english || '').trim();
     var source = args.source === 'translated' ? 'translated' : 'starter';
     var hit = null;
+    var want = normalizeTagalog(tagalog);
     for (var i = 0; i < STARTERS.length; i++) {
-      if (STARTERS[i].tagalog.toLowerCase() === tagalog.toLowerCase()) { hit = STARTERS[i]; break; }
+      if (normalizeTagalog(STARTERS[i].tagalog) === want) { hit = STARTERS[i]; break; }
     }
     if (hit) {
       tagalog = hit.tagalog;
-      if (!english) { english = hit.english; }
+      english = hit.english;
       source = 'starter';
     }
     if (!tagalog) {
