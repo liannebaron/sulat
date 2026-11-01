@@ -531,7 +531,7 @@
     } else {
       setActions(memory
         ? [{ label: 'Try again', primary: true, fn: clearInk }, { label: last ? 'See results →' : 'Skip →', fn: next }]
-        : [{ label: 'Show me again', fn: goShow }, { label: 'Try again', primary: true, fn: clearInk }]);
+        : [{ label: 'Show me again', fn: goShow }, { label: 'Try again', primary: true, fn: clearInk }, { label: last ? 'Now from memory →' : 'Skip →', fn: next }]);
     }
   }
 
