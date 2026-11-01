@@ -1,0 +1,407 @@
+<!-- Built with Muse Code. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sulat · Talk</title>
+<style>
+  :root {
+    --page: #eceff3;
+    --card: #ffffff;
+    --ink: #14161a;
+    --quiet: #5d6572;
+    --line: #d9dde3;
+    --accent: #1f3a8a;
+    --live: #b3261e;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    overscroll-behavior: none;
+  }
+  .wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 16px;
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+  }
+  h1 { margin: 4px 0 2px; font: 400 30px Georgia, "Times New Roman", serif; }
+  .lede { margin: 0 0 16px; color: var(--quiet); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+  #talk {
+    display: block;
+    width: 100%;
+    min-height: 120px;
+    font-size: 22px;
+    font-weight: 600;
+    border-radius: 16px;
+    border: 1px solid var(--line);
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    cursor: pointer;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  #talk.live { background: var(--live); border-color: var(--live); }
+  #talk:disabled { opacity: 0.55; cursor: default; }
+  #talk:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .hint { margin: 10px 0 0; color: var(--quiet); }
+  #status { min-height: 1.4em; margin: 10px 0 0; color: var(--quiet); }
+  #status.error { color: var(--live); }
+  #heard { margin: 0 0 12px; color: var(--quiet); font-style: italic; }
+  #phrase { margin: 0 0 2px; font: 400 34px Georgia, "Times New Roman", serif; }
+  #meaning { margin: 0 0 4px; color: var(--quiet); font-size: 18px; }
+  #note {
+    display: inline-block;
+    margin: 6px 0 0;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: #f4f6fa;
+    color: var(--quiet);
+    font-size: 14px;
+  }
+  #reply { margin: 0; font-size: 18px; }
+  #go {
+    display: inline-flex;
+    align-items: center;
+    min-height: 48px;
+    margin-top: 12px;
+    padding: 0 18px;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  #go:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  #timings { margin: 12px 0 0; color: var(--quiet); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Talk to Sulat</h1>
+  <p class="lede">Hold the button and ask, for example, &ldquo;How do I write I love you?&rdquo;</p>
+
+  <div class="card">
+    <button id="talk" type="button">Tap to allow the microphone</button>
+    <p class="hint" id="hint">First tap only turns the microphone on. After that, hold to talk.</p>
+    <p id="status" role="status" aria-live="polite"></p>
+  </div>
+
+  <div class="card" id="result" hidden>
+    <p id="heard"></p>
+    <p id="phrase" hidden></p>
+    <p id="meaning" hidden></p>
+    <p id="reply" hidden></p>
+    <span id="note" hidden>AI translation &mdash; have a Tagalog speaker check it.</span>
+    <br>
+    <a id="go" href="#" hidden>Show me &rarr;</a>
+    <p id="timings"></p>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+  var talk = $('talk'), hint = $('hint'), statusEl = $('status');
+  var result = $('result'), heard = $('heard'), phrase = $('phrase');
+  var meaning = $('meaning'), reply = $('reply'), note = $('note');
+  var go = $('go'), timings = $('timings');
+
+  var MAX_HOLD_MS = 12000;
+  var SILENCE_RMS = 0.015;
+  var MIN_SAMPLES = 3200; // 0.2 s at 16 kHz
+
+  // Captures mono samples while the page tells it to. Loaded from an inline
+  // Blob so this page stays a single file with no build step.
+  var WORKLET_SRC = 'class TapRecorder extends AudioWorkletProcessor {' +
+    'constructor(){super();this.recording=false;' +
+    'this.port.onmessage=(e)=>{this.recording=!!e.data.recording;};}' +
+    'process(inputs){var ch=inputs[0]&&inputs[0][0];' +
+    'if(this.recording&&ch){this.port.postMessage(ch.slice(0));}return true;}}' +
+    'registerProcessor("tap-recorder",TapRecorder);';
+
+  var stream = null, ctx = null, port = null;
+  var armed = false, arming = false;
+  var recording = false, busy = false;
+  var chunks = [], holdTimer = 0;
+  var lastMs = { transcribe: null, intent: null };
+
+  function say(msg, isError) {
+    statusEl.textContent = msg;
+    statusEl.classList.toggle('error', !!isError);
+  }
+
+  function resetButton() {
+    talk.classList.remove('live');
+    talk.textContent = 'Hold to talk';
+  }
+
+  function disarm() {
+    armed = false;
+    stream = null;
+    talk.textContent = 'Tap to allow the microphone';
+  }
+
+  // First tap: permission only. The stream stays open so later holds record instantly.
+  function arm() {
+    if (armed || arming) { return Promise.resolve(armed); }
+    arming = true;
+    say('Requesting the microphone\u2026');
+    var p = Promise.resolve();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      arming = false;
+      say('This browser cannot record audio. Try iPhone Safari or Chrome.', true);
+      return Promise.resolve(false);
+    }
+    return navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 }
+    }).then(function (s) {
+      stream = s;
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) { throw new Error('no-audio-context'); }
+      ctx = new AC();
+      var ready = ctx.resume ? ctx.resume().catch(function () {}) : Promise.resolve();
+      return ready.then(function () {
+        var url = URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }));
+        return ctx.audioWorklet.addModule(url).then(function () {
+          URL.revokeObjectURL(url);
+          var source = ctx.createMediaStreamSource(stream);
+          var node = new AudioWorkletNode(ctx, 'tap-recorder');
+          port = node.port;
+          port.onmessage = function (e) { if (recording) { chunks.push(e.data); } };
+          source.connect(node);
+          // Keep the graph alive without making a sound.
+          var hush = ctx.createGain();
+          hush.gain.value = 0;
+          node.connect(hush);
+          hush.connect(ctx.destination);
+          stream.getTracks().forEach(function (t) {
+            t.onended = function () { disarm(); say('The microphone turned off. Tap to allow it again.'); };
+          });
+          armed = true;
+          talk.textContent = 'Hold to talk';
+          say('Microphone ready. Hold the button and ask.');
+          hint.textContent = 'Hold while you speak, release to send.';
+        });
+      });
+    }).catch(function (err) {
+      if (err && err.name === 'NotAllowedError') {
+        say('Microphone access was denied. Allow it in Safari (aA \u2192 Website Settings \u2192 Microphone), then tap again.', true);
+      } else if (err && err.name === 'NotFoundError') {
+        say('No microphone was found on this device.', true);
+      } else {
+        say('Could not start the microphone. Tap to try again.', true);
+      }
+      stream = null;
+      return false;
+    }).then(function (ok) {
+      arming = false;
+      return ok === true && armed;
+    });
+  }
+
+  function beginHold() {
+    if (!armed || busy) { return; }
+    if (ctx && ctx.state === 'suspended' && ctx.resume) { ctx.resume().catch(function () {}); }
+    chunks = [];
+    recording = true;
+    port.postMessage({ recording: true });
+    talk.classList.add('live');
+    talk.textContent = 'Listening\u2026 release to send';
+    say('');
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(endHold, MAX_HOLD_MS);
+  }
+
+  function concat(samples) {
+    var total = 0, i;
+    for (i = 0; i < samples.length; i++) { total += samples[i].length; }
+    var out = new Float32Array(total);
+    var at = 0;
+    for (i = 0; i < samples.length; i++) { out.set(samples[i], at); at += samples[i].length; }
+    return out;
+  }
+
+  function rmsOf(samples) {
+    if (!samples.length) { return 0; }
+    var sum = 0;
+    for (var i = 0; i < samples.length; i++) { sum += samples[i] * samples[i]; }
+    return Math.sqrt(sum / samples.length);
+  }
+
+  // Resamples to 16 kHz mono 16-bit PCM WAV, the format /api/transcribe accepts.
+  function encodeWav(samples, inRate) {
+    var outRate = 16000;
+    var frames = Math.floor(samples.length * outRate / inRate);
+    var bytes = 44 + frames * 2;
+    var buf = new ArrayBuffer(bytes);
+    var v = new DataView(buf);
+    function ascii(at, s) { for (var i = 0; i < s.length; i++) { v.setUint8(at + i, s.charCodeAt(i)); } }
+    ascii(0, 'RIFF');
+    v.setUint32(4, bytes - 8, true);
+    ascii(8, 'WAVE');
+    ascii(12, 'fmt ');
+    v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true);
+    v.setUint16(22, 1, true);
+    v.setUint32(24, outRate, true);
+    v.setUint32(28, outRate * 2, true);
+    v.setUint16(32, 2, true);
+    v.setUint16(34, 16, true);
+    ascii(36, 'data');
+    v.setUint32(40, frames * 2, true);
+    for (var i = 0; i < frames; i++) {
+      var pos = i * inRate / outRate;
+      var i0 = Math.floor(pos);
+      var i1 = Math.min(i0 + 1, samples.length - 1);
+      var frac = pos - i0;
+      var s = samples[i0] * (1 - frac) + samples[i1] * frac;
+      if (s > 1) { s = 1; } else if (s < -1) { s = -1; }
+      v.setInt16(44 + i * 2, Math.round(s * 32767), true);
+    }
+    return new Blob([buf], { type: 'audio/wav' });
+  }
+
+  function readError(res, fallback) {
+    return res.json().then(function (j) {
+      return new Error((j && j.error) || fallback);
+    }).catch(function () {
+      return new Error(fallback + ' (' + res.status + ')');
+    });
+  }
+
+  function endHold() {
+    if (!recording) { return; }
+    recording = false;
+    clearTimeout(holdTimer);
+    if (port) { port.postMessage({ recording: false }); }
+    var samples = concat(chunks);
+    chunks = [];
+    resetButton();
+    if (samples.length < MIN_SAMPLES || rmsOf(samples) < SILENCE_RMS) {
+      say('Nothing heard. Hold the button and speak, then release.', true);
+      return;
+    }
+    busy = true;
+    talk.disabled = true;
+    say('Writing down what you said\u2026');
+    var wav = encodeWav(samples, ctx ? ctx.sampleRate : 48000);
+    fetch('/api/transcribe', { method: 'POST', headers: { 'Content-Type': 'audio/wav' }, body: wav })
+      .then(function (res) {
+        if (!res.ok) { return readError(res, 'The voice service failed').then(function (e) { throw e; }); }
+        return res.json();
+      })
+      .then(function (t) {
+        var text = t && typeof t.text === 'string' ? t.text.trim() : '';
+        lastMs.transcribe = t && t.ms != null ? t.ms : null;
+        lastMs.intent = null;
+        if (!text) {
+          say('Nothing heard. Hold the button and speak, then release.', true);
+          return null;
+        }
+        say('Figuring out the phrase\u2026');
+        return fetch('/api/intent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: text })
+        }).then(function (res) {
+          if (!res.ok) { return readError(res, 'The lesson service failed').then(function (e) { throw e; }); }
+          return res.json();
+        }).then(function (found) {
+          showResult(text, found);
+          return found;
+        });
+      })
+      .catch(function (err) {
+        say('Something went wrong: ' + err.message, true);
+      })
+      .then(function () {
+        busy = false;
+        talk.disabled = false;
+      });
+  }
+
+  function showTimings() {
+    var parts = [];
+    if (lastMs.transcribe != null) { parts.push('Transcribed in ' + lastMs.transcribe + ' ms'); }
+    if (lastMs.intent != null) { parts.push('Lesson in ' + lastMs.intent + ' ms'); }
+    timings.textContent = parts.join(' \u00b7 ');
+  }
+
+  function showResult(text, found) {
+    result.hidden = false;
+    heard.textContent = '\u201c' + text + '\u201d';
+    phrase.hidden = true;
+    meaning.hidden = true;
+    reply.hidden = true;
+    note.hidden = true;
+    go.hidden = true;
+    if (!found) {
+      lastMs.intent = null;
+      showTimings();
+      say('');
+      return;
+    }
+    lastMs.intent = found.ms != null ? found.ms : null;
+    if (found.intent === 'teach' && found.tagalog) {
+      phrase.textContent = found.tagalog;
+      phrase.hidden = false;
+      meaning.textContent = found.english || '';
+      meaning.hidden = !found.english;
+      note.hidden = found.source !== 'translated';
+      go.href = 'animate.html?text=' + encodeURIComponent(found.tagalog);
+      go.hidden = false;
+      say('');
+    } else {
+      reply.textContent = found.reply || 'I teach Baybayin writing. Try asking "How do I write thank you?"';
+      reply.hidden = false;
+      say('');
+    }
+    showTimings();
+  }
+
+  talk.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    if (!armed) {
+      arm();
+      return;
+    }
+    beginHold();
+  });
+  talk.addEventListener('pointerup', function (e) {
+    e.preventDefault();
+    endHold();
+  });
+  talk.addEventListener('pointercancel', endHold);
+  talk.addEventListener('lostpointercapture', function () { /* release handled by pointerup */ });
+  talk.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  talk.addEventListener('keydown', function (e) {
+    if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) {
+      e.preventDefault();
+      if (!armed) { arm(); return; }
+      beginHold();
+    }
+  });
+  talk.addEventListener('keyup', function (e) {
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      endHold();
+    }
+  });
+})();
+</script>
+</body>
+</html>
