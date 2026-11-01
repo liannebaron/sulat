@@ -145,7 +145,7 @@
 </div>
 
 <script src="sulat-engine.js?v=3"></script>
-<script src="sulat-score.js?v=strict-2"></script>
+<script src="sulat-score.js?v=strict-5"></script>
 <script>
 (function () {
   'use strict';
@@ -222,6 +222,22 @@
       opts.markKind = it.mark.id === 'mark-virama' ? 'cross' : 'dot';
     }
     return { tok: tok, lay: lay, strokes: strokes, opts: opts };
+  }
+
+  // The other letters, drawn with the same vowel mark, so the scorer can tell whether a from-memory
+  // attempt is clearly closer to a different letter. Built once per syllable.
+  function alternativesFor(c) {
+    if (c.alts) { return c.alts; }
+    var out = [];
+    Object.keys(pack.glyphs).forEach(function (gid) {
+      if (gid.indexOf('mark') === 0 || gid === c.tok.base) { return; }
+      try {
+        var b = buildSyllable({ text: c.tok.text, base: gid, mark: c.tok.mark });
+        out.push({ strokes: b.strokes });
+      } catch (e) { /* skip a glyph that cannot be laid out */ }
+    });
+    c.alts = out;
+    return out;
   }
 
   function resize() {
@@ -490,6 +506,7 @@
     var memory = st.phase === 'try';
     var opts = { mode: memory ? 'memory' : 'trace' };
     Object.keys(cur.opts).forEach(function (k) { opts[k] = cur.opts[k]; });
+    if (memory) { opts.alternatives = alternativesFor(cur); }
     var res = SulatScore.score(cur.strokes, user, opts);
     if (res.issue === 'empty') { say(res.message, 'bad'); return; }
     checked = true;

@@ -106,8 +106,10 @@
     var memory = opts.mode === 'memory';
     // How far a stroke may stray, as a fraction of the glyph's size. Tracing is measured against the
     // guide itself; from memory, size and position are forgiven but the shape must hold.
-    var LIM = memory ? { mean: 0.09, p90: 0.15, minLen: 0.75 } : { mean: 0.075, p90: 0.15, minLen: 0 };
-    var TIP = memory ? 0.065 : 0.055;
+    // From memory the learner has only an image in their head, so the shape may be loose as long as it is
+    // clearly this letter: right strokes, order, direction and marks, and closer to this letter than to any other.
+    var LIM = memory ? { mean: 0.13, p90: 0.24, minLen: 0.7 } : { mean: 0.075, p90: 0.15, minLen: 0 };
+    var TIP = memory ? 0.09 : 0.055;
     var n = ref.length;
 
     if (!user.length) {
@@ -209,9 +211,23 @@
     }
 
     // 4. Direction, then 5. shape
+    // How much a stroke bends: its biggest sideways bulge from the straight line between its ends
+    // (or, for a loop, how far it strays from its start), as a fraction of the glyph's size.
+    function bend(p) {
+      var a = p[0], c = p[p.length - 1], chord = dist(a, c), mx = 0;
+      for (var q = 0; q < p.length; q++) {
+        var d = chord < 0.15 * R.size ? dist(a, p[q])
+          : Math.abs((c.y - a.y) * p[q].x - (c.x - a.x) * p[q].y + c.x * a.y - c.y * a.x) / chord;
+        if (d > mx) { mx = d; }
+      }
+      return mx / R.size;
+    }
+    var flat = [];
     var errors = [], load = [];
     var worst = 0, worstI = 0, offGuide = false;
     for (var m = 0; m < n; m++) {
+      var isMark = memory && k && m >= n - k;
+      if (isMark) { errors.push(0); load.push(0); continue; }
       var isDot = ref[m].pts.length < 2 || rlen[m] < 0.03;
       if (isDot) {
         // A dot or tiny mark: the side check above covers memory mode; when tracing it must sit on the guide.
@@ -229,8 +245,20 @@
         };
       }
       var lenRatio = lenOf(uu[m]) / lenOf(rr[m]);
-      var e = Math.max(st.mean / LIM.mean, st.p90 / LIM.p90, LIM.minLen && lenRatio < LIM.minLen ? 1.5 : 0);
-      errors.push(st.mean);
+      // From memory, judge a stroke's shape separately from where it sits: a crossbar a little too high or
+      // low is still a good crossbar. Placement gets its own, wider allowance.
+      var sh = st, place = 0;
+      if (memory) {
+        var rc2 = centroid([{ pts: rr[m] }]), uc2 = centroid([{ pts: uu[m] }]);
+        place = dist(rc2, uc2) / R.size;
+        sh = stat(rr[m], uu[m].map(function (p) { return { x: p.x - uc2.x + rc2.x, y: p.y - uc2.y + rc2.y }; }));
+      }
+      var e = Math.max(sh.mean / LIM.mean, sh.p90 / LIM.p90, LIM.minLen && lenRatio < LIM.minLen ? 1.5 : 0, memory ? place / 0.3 : 0);
+      if (memory) {
+        var rb = bend(rr[m]), ub = bend(uu[m]);
+        if (rb > 0.06 && ub < 0.45 * rb) { flat[m] = true; e = Math.max(e, 1.5); }
+      }
+      errors.push(sh.mean);
       load.push(e);
       if (e > worst) { worst = e; worstI = m; }
       if (!memory && e > 1) {
@@ -240,6 +268,28 @@
           return { x: p.x - cu.cx + cr.cx, y: p.y - cu.cy + cr.cy };
         }), N));
         if (al.mean < LIM.mean * 0.6 && al.p90 < LIM.p90 * 0.8) { offGuide = true; }
+      }
+    }
+    // Is it clearly closer to a different letter? (From memory only; needs the other letters from the page.)
+    if (memory && worst <= 1 && opts.alternatives && opts.alternatives.length) {
+      var fit = function (target) {
+        var Rt = bbox(target), sc = Rt.size / U2.size, tot = 0, cnt = 0;
+        for (var q = 0; q < target.length; q++) {
+          if (k && q >= target.length - k) { continue; }
+          var a2 = resample(target[q].pts, N);
+          var b2 = resample(user[q].pts.map(function (p) { return { x: (p.x - U2.cx) * sc + Rt.cx, y: (p.y - U2.cy) * sc + Rt.cy }; }), N);
+          tot += Math.min(avg(distances(a2, b2)), avg(distances(a2, b2.slice().reverse()))) / Rt.size; cnt++;
+        }
+        return cnt ? tot / cnt : 0;
+      };
+      var U2 = bbox(user);
+      var own0 = fit(ref), best = 1e9;
+      opts.alternatives.forEach(function (alt) { if (alt.strokes.length === n) { best = Math.min(best, fit(alt.strokes)); } });
+      if (own0 > 0.05 && best < own0 * 0.8) {
+        return {
+          pass: false, issue: 'lookalike', error: own0, transform: transform,
+          message: 'That reads more like a different letter. Compare it with the guide, then try again.'
+        };
       }
     }
     var mean = errors.reduce(function (a, b) { return a + b; }, 0) / n;
@@ -254,9 +304,11 @@
         };
       }
       return {
-        pass: false, issue: 'shape', stroke: worstI, error: mean, strokes: strokes, transform: transform,
-        message: which + ' drifts from the shape. ' +
-          (memory ? 'Compare it with the guide, then try again.' : 'Trace closer to the guide and try again.')
+        pass: false, issue: flat[worstI] ? 'straight' : 'shape', stroke: worstI, error: mean, strokes: strokes, transform: transform,
+        message: flat[worstI]
+          ? which + ' should curve more, like the guide. Compare it, then try again.'
+          : which + ' drifts from the shape. ' +
+            (memory ? 'Compare it with the guide, then try again.' : 'Trace closer to the guide and try again.')
       };
     }
     if (worst > TIP / (memory ? LIM.mean : LIM.mean)) {
@@ -269,5 +321,5 @@
     return { pass: true, issue: null, error: mean, strokes: strokes, transform: transform, message: 'Looks right!' };
   }
 
-  global.SulatScore = { score: score, resample: resample, bbox: bbox, version: 'strict-2' };
+  global.SulatScore = { score: score, resample: resample, bbox: bbox, version: 'strict-5' };
 })(typeof window !== 'undefined' ? window : this);
