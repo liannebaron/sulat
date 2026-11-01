@@ -73,6 +73,8 @@ export async function onRequestPost(context) {
       },
       body: JSON.stringify({
         model: 'muse-spark-1.3',
+        // Light reasoning pass for lower latency; "none" is rejected for Spark.
+        reasoning_effort: 'low',
         max_completion_tokens: 3000,
         messages: [
           { role: 'system', content: SYSTEM },

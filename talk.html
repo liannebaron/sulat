@@ -16,6 +16,7 @@
     --live: #b3261e;
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   html, body { margin: 0; }
   body {
     background: var(--page);
@@ -388,7 +389,7 @@
           say('Nothing heard. Hold the button and speak, then release.', true);
           return null;
         }
-        say('Figuring out the phrase\u2026');
+        say('Thinking\u2026');
         return fetch('/api/intent', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
