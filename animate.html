@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Sulat · Show me</title>
+<script>
+  // Runs before anything is drawn, so the glasses never flash the light page layout.
+  if (/[?&]view=glasses(&|$)/.test(window.location.search)) { document.documentElement.className += ' glasses'; }
+</script>
 <style>
   :root {
     --page: #eceff3;
@@ -68,10 +72,10 @@
   #status { min-height: 1.4em; color: var(--quiet); margin: 8px 0 0; }
 
   /* Glasses view: 600x600, black is see-through on the Display, one word per card. */
-  body.glasses { background: #000; color: #f2efe8; }
-  body.glasses .wrap { display: none; }
+  html.glasses, html.glasses body { background: #000; color: #f2efe8; }
+  html.glasses .wrap { display: none; }
   #lens { display: none; }
-  body.glasses #lens {
+  html.glasses #lens {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -152,7 +156,7 @@
 
   var params = new URLSearchParams(window.location.search);
   var glasses = params.get('view') === 'glasses';
-  document.body.classList.toggle('glasses', glasses);
+  document.documentElement.classList.toggle('glasses', glasses);
 
   var $ = function (id) { return document.getElementById(id); };
   var input = $('phrase');
