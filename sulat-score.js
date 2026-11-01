@@ -101,6 +101,25 @@
     return out;
   }
 
+  function segDist(p, a, b) {
+    var dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+    var t = l2 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
+    return { d: Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy)), t: t };
+  }
+  // For each point of A, the distance to the nearest point on path B. Unlike a point-by-point comparison,
+  // this does not care whether the learner's stroke is a bit longer or shorter than the guide.
+  // Each result says how far, and whether the nearest spot is just the very end of B (an overshoot).
+  function nearest(A, B) {
+    return A.map(function (p) {
+      var m = 1e9, mi = 0, mt = 0;
+      for (var i = 0; i < B.length - 1; i++) {
+        var r = segDist(p, B[i], B[i + 1]);
+        if (r.d < m) { m = r.d; mi = i; mt = r.t; }
+      }
+      return { d: m, end: (mi === 0 && mt === 0) || (mi === B.length - 2 && mt === 1) };
+    });
+  }
+
   function score(ref, user, opts) {
     opts = opts || {};
     var memory = opts.mode === 'memory';
@@ -108,8 +127,12 @@
     // guide itself; from memory, size and position are forgiven but the shape must hold.
     // From memory the learner has only an image in their head, so the shape may be loose as long as it is
     // clearly this letter: right strokes, order, direction and marks, and closer to this letter than to any other.
-    var LIM = memory ? { mean: 0.13, p90: 0.24, minLen: 0.7 } : { mean: 0.075, p90: 0.15, minLen: 0 };
+    var LIM = memory ? { mean: 0.15, p90: 0.28, minLen: 0.7 } : { mean: 0.075, p90: 0.15, minLen: 0 };
     var TIP = memory ? 0.09 : 0.055;
+    // Tracing: how far the learner's line strays from the guide (user to guide), and how much of the guide
+    // is left uncovered (guide to user), as fractions of glyph size. Overshooting or stopping a little
+    // short is normal with a finger, so ends are not punished the way a point-by-point match would.
+    var TRACE = { m1: 0.06, p1: 0.12, m2: 0.08, p2: 0.16, mark: 0.22 };
     var n = ref.length;
 
     if (!user.length) {
@@ -226,8 +249,13 @@
     var errors = [], load = [];
     var worst = 0, worstI = 0, offGuide = false;
     for (var m = 0; m < n; m++) {
-      var isMark = memory && k && m >= n - k;
-      if (isMark) { errors.push(0); load.push(0); continue; }
+      var isMark = k && m >= n - k;
+      if (isMark) {
+        var moff = memory ? 0 : dist(centroid([ref[m]]), centroid([userN[m]])) / R.size;
+        errors.push(moff); load.push(memory ? 0 : moff / TRACE.mark);
+        if (load[m] > worst) { worst = load[m]; worstI = m; }
+        continue;
+      }
       var isDot = ref[m].pts.length < 2 || rlen[m] < 0.03;
       if (isDot) {
         // A dot or tiny mark: the side check above covers memory mode; when tracing it must sit on the guide.
@@ -254,10 +282,18 @@
         sh = stat(rr[m], uu[m].map(function (p) { return { x: p.x - uc2.x + rc2.x, y: p.y - uc2.y + rc2.y }; }));
       }
       var e = Math.max(sh.mean / LIM.mean, sh.p90 / LIM.p90, LIM.minLen && lenRatio < LIM.minLen ? 1.5 : 0, memory ? place / 0.3 : 0);
-      if (memory) {
-        var rb = bend(rr[m]), ub = bend(uu[m]);
-        if (rb > 0.06 && ub < 0.45 * rb) { flat[m] = true; e = Math.max(e, 1.5); }
+      if (!memory) {
+        var gp = resample(ref[m].pts, 64), up = resample(userN[m].pts, 64);
+        var n1 = nearest(up, gp), n2 = nearest(gp, up);
+        // Running past either end of the guide is fine in moderation (a finger overshoots); a long tail is not.
+        var onGuide = n1.filter(function (o) { return !o.end; });
+        var overshoot = 1 - onGuide.length / n1.length;
+        var d1 = (onGuide.length ? onGuide : n1).map(function (o) { return o.d; });
+        var d2 = n2.map(function (o) { return o.d; });
+        e = Math.max(avg(d1) / R.size / TRACE.m1, p90(d1) / R.size / TRACE.p1, avg(d2) / R.size / TRACE.m2, p90(d2) / R.size / TRACE.p2, overshoot / 0.35);
       }
+      var rb = bend(rr[m]), ub = bend(uu[m]);
+      if (rb > 0.06 && ub < 0.45 * rb) { flat[m] = true; e = Math.max(e, 1.5); }
       errors.push(sh.mean);
       load.push(e);
       if (e > worst) { worst = e; worstI = m; }
@@ -321,5 +357,5 @@
     return { pass: true, issue: null, error: mean, strokes: strokes, transform: transform, message: 'Looks right!' };
   }
 
-  global.SulatScore = { score: score, resample: resample, bbox: bbox, version: 'strict-5' };
+  global.SulatScore = { score: score, resample: resample, bbox: bbox, version: 'strict-6' };
 })(typeof window !== 'undefined' ? window : this);
