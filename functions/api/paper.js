@@ -106,6 +106,8 @@ export async function onRequestPost(context) {
     'Normal handwriting varies: ignore size, slant, and proportions. ' +
     'Stroke order, stroke direction, and the number of strokes DO NOT matter. ' +
     'Judge only whether the handwritten character is clear and distinguishable from other Baybayin characters. ' +
+    'Before anything else, compare the shape with the reference. ' +
+    'If it reads as a different Baybayin character, the verdict is retry and the tip says it looks like a different letter. ' +
     'The one thing that must be right is the vowel mark, because it changes the sound. ' +
     'Be kind and specific. Never mention stroke order, stroke direction, or stroke count. ' +
     'Reply with JSON only: {"verdict": "good" | "almost" | "retry", "tips": ["...", "..."]}, ' +
@@ -130,7 +132,7 @@ export async function onRequestPost(context) {
       },
       body: JSON.stringify({
         model: 'muse-spark-1.3',
-        max_completion_tokens: 3000,
+        max_completion_tokens: 6000,
         messages: [
           { role: 'system', content: system },
           {
@@ -162,6 +164,8 @@ export async function onRequestPost(context) {
   var data = null;
   try { data = await metaRes.json(); } catch (e) { /* handled below */ }
   var msg = data && data.choices && data.choices[0] && data.choices[0].message;
+  var finishReason = data && data.choices && data.choices[0] && data.choices[0].finish_reason;
+  var usage = data && data.usage;
   var content = '';
   if (msg) {
     if (typeof msg.content === 'string') { content = msg.content; }
@@ -174,7 +178,23 @@ export async function onRequestPost(context) {
   }
   var parsed = parseVerdict(content);
   if (!parsed) {
-    return Response.json({ error: 'The feedback came back unclear. Try again with a sharper photo.', ms: ms }, { status: 502 });
+    // TODO: remove the debug text before going public.
+    return Response.json({
+      error: 'The feedback came back unclear. Try again with a sharper photo.',
+      debug: {
+        finish_reason: finishReason || null,
+        content_length: content.length,
+        content_head: content.slice(0, 300)
+      },
+      ms: ms
+    }, { status: 502 });
   }
-  return Response.json({ verdict: parsed.verdict, tips: parsed.tips, ms: ms });
+  // TODO: remove the debug usage before going public.
+  var usageOut = null;
+  if (usage) {
+    usageOut = { completion_tokens: usage.completion_tokens != null ? usage.completion_tokens : null };
+    var det = usage.completion_tokens_details || usage.completion_details;
+    if (det && det.reasoning_tokens != null) { usageOut.reasoning_tokens = det.reasoning_tokens; }
+  }
+  return Response.json({ verdict: parsed.verdict, tips: parsed.tips, ms: ms, usage: usageOut });
 }
