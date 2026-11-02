@@ -315,9 +315,11 @@
     ubN.forEach(function (st) { userInk += pathLen(st.pts); });
     var inkRatio = userInk / refInk;
     if (missingFrac > 0.5 || inkRatio < 0.8) {
+      if (missingI < 0) { missingI = worstCoverI; }
+      var where = missingFrac > 0.5 ? 'Stroke ' + (missingI + 1) + ' looks missing or too far from the shape. '
+        : 'Part of the letter looks missing or too short. ';
       return { pass: false, issue: 'missing', stroke: missingI, error: mean, transform: transform,
-        message: 'Stroke ' + (missingI + 1) + ' looks missing or too far from the shape. ' +
-          (memory ? 'Picture Show me and try again.' : 'Follow the numbers on the guide.') };
+        message: where + (memory ? 'Picture Show me and try again.' : 'Follow the numbers on the guide.') };
     }
     if (flatI >= 0) {
       return { pass: false, issue: 'straight', stroke: flatI, error: mean, transform: transform,
@@ -618,5 +620,5 @@
     return { pass: true, issue: null, error: mean, strokes: strokes, transform: transform, message: 'Looks right!' };
   }
 
-  global.SulatScore = { score: score, resample: resample, bbox: bbox, version: 'legible-1' };
+  global.SulatScore = { score: score, resample: resample, bbox: bbox, version: 'legible-2' };
 })(typeof window !== 'undefined' ? window : this);
