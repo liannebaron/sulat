@@ -122,7 +122,10 @@ export async function onRequestPost(context) {
     'Verdicts: "good" means it clearly reads as the target with the right mark. ' +
     '"almost" means it reads as the target but one part could be clearer (say which in a tip). ' +
     '"retry" means it reads as a different character, a part is missing, ' +
-    'or the vowel mark is missing or on the wrong side.';
+    'or the vowel mark is missing or on the wrong side. ' +
+    'Only say it looks like a different letter if it would actually be read as another Baybayin character. ' +
+    'Style differences, such as a hook instead of a corner, a slightly different angle, ' +
+    'or a bar that is a little short, are "almost" with a tip, not "retry".';
   var photoUrl = 'data:' + (photo.indexOf('iVBO') === 0 ? 'image/png' : 'image/jpeg') + ';base64,' + photo;
   var userText = 'The target syllable is "' + target.toLowerCase() + '". ' +
     'The expected vowel mark is ' + markText(tok) + '. ' +
