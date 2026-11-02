@@ -88,6 +88,14 @@
   th { color: var(--quiet); font-weight: 500; }
   .ok { color: var(--good); }
   .no { color: var(--warn); }
+  /* Pencil taps and quick marks must never select page text (found in the family study). */
+  body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  input, #copyStatus { -webkit-user-select: text; user-select: text; }
+  #startBtn { min-height: 56px; padding: 0 28px; font-size: 18px; }
+  #howTitle { margin: 16px 0 0; font-weight: 600; }
+  #howItWorks { margin: 6px 0 0; padding-left: 22px; }
+  #howItWorks li { margin: 4px 0; }
+  #howTip { margin: 8px 0 0; color: var(--quiet); }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -103,6 +111,13 @@
     <ol id="sylList"></ol>
     <label class="field" for="learner">Learner (optional, for your notes)</label>
     <input id="learner" type="text" autocomplete="off" placeholder="Name or initials">
+    <p id="howTitle">How the lesson works</p>
+    <ol id="howItWorks">
+      <li><b>Watch</b> each syllable being written.</li>
+      <li><b>Trace</b> it over the guide.</li>
+      <li><b>Write the whole phrase from memory</b>, with no guide. Tap Peek if you get stuck.</li>
+    </ol>
+    <p id="howTip">Tip: while you trace, try to remember each shape. You’ll write them on your own at the end.</p>
     <div class="row" style="margin-top:14px">
       <button id="startBtn" type="button" class="primary">Start the lesson</button>
     </div>
@@ -145,7 +160,7 @@
 </div>
 
 <script src="sulat-engine.js?v=3"></script>
-<script src="sulat-score.js?v=strict-6"></script>
+<script src="sulat-score.js?v=legible-1"></script>
 <script>
 (function () {
   'use strict';
@@ -157,6 +172,7 @@
     { text: 'magandang umaga', en: 'good morning' },
     { text: 'paalam', en: 'goodbye' }
   ];
+  var PAGE_VERSION = 'practice-nov2b';
   var SPEED = 0.75;          // a little slower than Show me, for learners
   var INK = 24;              // stroke width in glyph units
   var $ = function (id) { return document.getElementById(id); };
@@ -366,11 +382,13 @@
   }
 
   var ghost = null;
+  var peeking = false, peekTimer = null;
   function redraw() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, size, size);
     if (!cur) { return; }
     if (st.phase === 'trace') { drawRef('#d3d8df'); drawMarkers(); }
+    if (peeking && st.phase === 'try') { drawRef('rgba(31,58,138,0.28)'); }
     drawUser();
     if (ghost) { drawRef('rgba(31,58,138,0.38)', ghost); }
   }
@@ -385,7 +403,11 @@
     if (e.pointerType === 'pen') { lastPenAt = now; }
     if (drawing) {
       // A resting palm can start a stroke before the Pencil lands. The Pencil wins.
-      if (e.pointerType === 'pen' && drawing.type === 'touch') { drawing = null; } else { return; }
+      if (e.pointerType === 'pen' && drawing.type === 'touch') { drawing = null; }
+      // A quick second Pencil mark (like the two lines of a cross) can arrive before the first one ends.
+      // A Pencil can only be in one place, so end the first mark and keep both.
+      else if (e.pointerType === 'pen' && drawing.type === 'pen' && e.pointerId !== drawing.pid) { finish(); }
+      else { return; }
     }
     // Ignore touches only while the Pencil is in use, so a finger works again a moment later.
     if (e.pointerType === 'touch' && now - lastPenAt < 1200) { return; }
@@ -479,20 +501,53 @@
     showSvg(false);
     redraw();
     say('Trace over the guide. Follow the numbers and arrows.');
-    setActions([
-      { label: 'Clear', fn: clearInk },
-      { label: 'Check', primary: true, fn: check }
-    ]);
+    drawActions();
+  }
+
+  // Undo, Clear, Peek (from memory only), Check. Undo and Peek were asked for in the family study.
+  function drawActions() {
+    var list = [{ label: 'Undo', fn: undo }, { label: 'Clear', fn: clearInk }];
+    if (st.phase === 'try') { list.push({ label: 'Peek', fn: peek }); }
+    list.push({ label: 'Check', primary: true, fn: check });
+    setActions(list);
+  }
+
+  function undo() {
+    if (checked || !user.length) { return; }
+    user.pop();
+    redraw();
+  }
+
+  function stopPeek() {
+    clearTimeout(peekTimer);
+    if (peeking) { peeking = false; $('tip').textContent = ''; }
+  }
+
+  // A short look at the letter, logged as a peek rather than a failed try.
+  function peek() {
+    if (checked || st.phase !== 'try') { return; }
+    var r = st.results[st.idx];
+    r.peeks = (r.peeks || 0) + 1;
+    r.log.push({ phase: 'try', peek: true, at: Date.now() });
+    peeking = true;
+    redraw();
+    $('tip').textContent = 'Have a quick look. It fades in a moment.';
+    clearTimeout(peekTimer);
+    peekTimer = setTimeout(function () { stopPeek(); redraw(); }, 2000);
+  }
+
+  function skip() {
+    var r = st.results[st.idx];
+    if (r) { r.log.push({ phase: st.phase, skip: true, at: Date.now() }); }
+    next();
   }
 
   function clearInk() {
     user = []; drawing = null; checked = false; ghost = null;
+    stopPeek();
     redraw();
     say(st.phase === 'try' ? 'Write “' + cur.tok.text + '” from memory.' : 'Trace over the guide. Follow the numbers and arrows.');
-    setActions([
-      { label: 'Clear', fn: clearInk },
-      { label: 'Check', primary: true, fn: check }
-    ]);
+    drawActions();
   }
 
   function alignedGhost() {
@@ -503,6 +558,7 @@
 
   function check() {
     if (drawing) { finish(); }
+    stopPeek();
     var memory = st.phase === 'try';
     var opts = { mode: memory ? 'memory' : 'trace' };
     Object.keys(cur.opts).forEach(function (k) { opts[k] = cur.opts[k]; });
@@ -513,7 +569,8 @@
     var r = st.results[st.idx];
     if (memory) {
       r.tryAttempts += 1;
-      if (r.tryFirst === null) { r.tryFirst = res.pass; }
+      // A first try only counts as from memory if the learner did not peek before it.
+      if (r.tryFirst === null) { r.tryFirst = res.pass && !r.peeks; }
       if (res.pass) { r.tryPassed = true; }
       ghost = res.transform || alignedGhost();   // reveal the correct glyph over their attempt
     } else {
@@ -530,8 +587,8 @@
         : [{ label: 'Trace again', fn: goTrace }, { label: last ? 'Now from memory →' : 'Next →', primary: true, fn: next }]);
     } else {
       setActions(memory
-        ? [{ label: 'Try again', primary: true, fn: clearInk }, { label: last ? 'See results →' : 'Skip →', fn: next }]
-        : [{ label: 'Show me again', fn: goShow }, { label: 'Try again', primary: true, fn: clearInk }, { label: last ? 'Now from memory →' : 'Skip →', fn: next }]);
+        ? [{ label: 'Try again', primary: true, fn: clearInk }, { label: last ? 'See results →' : 'Skip →', fn: skip }]
+        : [{ label: 'Show me again', fn: goShow }, { label: 'Try again', primary: true, fn: clearInk }, { label: last ? 'Now from memory →' : 'Skip →', fn: skip }]);
     }
   }
 
@@ -550,7 +607,7 @@
     $('where').textContent = st.text;
     $('phaseName').textContent = 'You try';
     $('cueBig').textContent = 'From memory';
-    $('cueSmall').textContent = 'No guide this time. You’ll only see how each syllable sounds.';
+    $('cueSmall').textContent = 'No guide this time. You’ll only see how each syllable sounds. Stuck? Tap Peek for a quick look.';
     say('');
     setActions([{ label: 'Begin', primary: true, fn: function () { st.idx = 0; goTry(); } }]);
   }
@@ -560,29 +617,57 @@
     cur = buildSyllable(st.tokens[st.idx]);
     computeMap();
     user = []; drawing = null; checked = false; ghost = null;
+    stopPeek();
     header('You try');
     $('cueBig').textContent = cur.tok.text;
     $('cueSmall').textContent = '';
     showSvg(false);
     redraw();
     say('Write “' + cur.tok.text + '” from memory.');
-    setActions([
-      { label: 'Clear', fn: clearInk },
-      { label: 'Check', primary: true, fn: check }
-    ]);
+    drawActions();
   }
 
   function firstTryCount() {
     return st.results.filter(function (r) { return r.tryFirst === true; }).length;
   }
 
+  function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
+
+  function traceLabel(r) {
+    return (r.tracePassed ? '' : 'skipped after ') + plural(r.traceAttempts, 'try', 'tries');
+  }
+
+  function memLabel(r) {
+    var s;
+    if (r.tryFirst) { s = 'first try'; }
+    else if (r.tryPassed && r.tryAttempts === 1) { s = 'first try, after a peek'; }
+    else if (r.tryPassed) { s = 'after ' + plural(r.tryAttempts, 'try', 'tries'); }
+    else { s = 'not yet (' + plural(r.tryAttempts, 'try', 'tries') + ')'; }
+    if (r.peeks && !(r.tryPassed && r.tryAttempts === 1)) { s += ', ' + plural(r.peeks, 'peek', 'peeks'); }
+    return s;
+  }
+
+  // Why each attempt failed, so a session can be checked for unfair fails afterwards.
+  function reasons(r, phase) {
+    var c = {}, order = [];
+    r.log.forEach(function (e) {
+      if (e.phase === phase && e.pass === false && e.issue) {
+        if (!c[e.issue]) { c[e.issue] = 0; order.push(e.issue); }
+        c[e.issue] += 1;
+      }
+    });
+    return order.length ? ' [missed: ' + order.map(function (k) { return k + (c[k] > 1 ? ' x' + c[k] : ''); }).join(', ') + ']' : '';
+  }
+
   function resultsText() {
     var n = st.results.length;
+    var peeks = st.results.reduce(function (a, r) { return a + (r.peeks || 0); }, 0);
     var lines = ['Sulat practice: ' + st.text + (st.learner ? ' (learner: ' + st.learner + ')' : '') + ', ' + new Date().toLocaleString()];
-    lines.push('From memory, right on the first try: ' + firstTryCount() + ' of ' + n);
+    lines.push('Scorer ' + (SulatScore.version || '?') + ', page ' + PAGE_VERSION);
+    lines.push('From memory, right on the first try (no peek): ' + firstTryCount() + ' of ' + n + '. Peeks used: ' + peeks);
     st.results.forEach(function (r) {
-      var mem = r.tryFirst ? 'right first try' : (r.tryPassed ? 'right after ' + r.tryAttempts + ' tries' : 'not yet (' + r.tryAttempts + ' tries)');
-      lines.push('- ' + r.text + ': traced in ' + r.traceAttempts + (r.traceAttempts === 1 ? ' try' : ' tries') + '; from memory ' + mem);
+      lines.push('- ' + r.text + ': ' + (r.tracePassed ? 'traced in ' : 'trace ') + traceLabel(r) + reasons(r, 'trace') +
+        '; from memory ' + (r.tryPassed || r.tryFirst ? 'right ' : '') + memLabel(r) + reasons(r, 'try'));
     });
     return lines.join('\n');
   }
@@ -599,9 +684,8 @@
     body.innerHTML = '';
     st.results.forEach(function (r) {
       var tr = document.createElement('tr');
-      var mem = r.tryFirst ? '<span class="ok">first try</span>'
-        : (r.tryPassed ? '<span class="ok">after ' + r.tryAttempts + ' tries</span>' : '<span class="no">not yet</span>');
-      tr.innerHTML = '<td>' + r.text + '</td><td>' + r.traceAttempts + (r.traceAttempts === 1 ? ' try' : ' tries') + '</td><td>' + mem + '</td>';
+      var mem = '<span class="' + (r.tryPassed ? 'ok' : 'no') + '">' + memLabel(r) + '</span>';
+      tr.innerHTML = '<td>' + r.text + '</td><td>' + traceLabel(r) + '</td><td>' + mem + '</td>';
       body.appendChild(tr);
     });
     try {
@@ -616,7 +700,7 @@
     st.learner = $('learner').value.trim();
     st.idx = 0;
     st.results = st.tokens.map(function (t) {
-      return { text: t.text, traceAttempts: 0, tracePassed: false, tryAttempts: 0, tryFirst: null, tryPassed: false, log: [] };
+      return { text: t.text, traceAttempts: 0, tracePassed: false, tryAttempts: 0, tryFirst: null, tryPassed: false, peeks: 0, log: [] };
     });
     $('introCard').hidden = true;
     $('doneCard').hidden = true;
@@ -690,10 +774,11 @@
       return { x: r.left + (p.x * map.k + map.ox) * (r.width / size), y: r.top + (p.y * map.k + map.oy) * (r.height / size) };
     },
     resultsText: resultsText,
-    strokeCount: function () { return user.length; }
+    strokeCount: function () { return user.length; },
+    isPeeking: function () { return peeking; }
   };
 
-  $('scorerStamp').textContent = 'Scorer: ' + (SulatScore.version || 'OLD version, upload sulat-score.js again');
+  $('scorerStamp').textContent = 'Scorer: ' + (SulatScore.version || 'OLD version, upload sulat-score.js again') + ' · Page: ' + PAGE_VERSION;
 
   Sulat.loadPack('packs/baybayin.json').then(function (p) {
     pack = p;

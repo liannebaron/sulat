@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sulat · Glasses check</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; color: #fff; overflow: hidden; }
+  body { font: 22px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+  #stage { position: relative; width: 600px; height: 600px; max-width: 100vw; max-height: 100vh; margin: 0 auto; box-sizing: border-box; padding: 18px 22px; outline: 1px dashed #444; outline-offset: -1px; }
+  h1 { margin: 0 0 6px; font: 400 30px Georgia, "Times New Roman", serif; }
+  .screen { display: none; }
+  .screen.on { display: block; }
+  .quiet { color: #bbb; font-size: 18px; }
+  .mono { font: 17px/1.4 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
+  #foot { position: absolute; left: 22px; right: 22px; bottom: 12px; display: flex; justify-content: space-between; color: #aaa; font-size: 17px; }
+  .bar { display: flex; align-items: center; gap: 12px; margin: 7px 0; }
+  .bar span { width: 64px; text-align: right; color: #ccc; font-size: 17px; }
+  .keys b { display: inline-block; min-width: 76px; margin: 3px 6px 3px 0; padding: 4px 8px; border: 1px solid #666; border-radius: 8px; text-align: center; color: #888; font-weight: 400; }
+  .keys b.seen { color: #000; background: #fff; border-color: #fff; }
+  #lastKeys { margin-top: 10px; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <section class="screen on" id="s1">
+    <h1>Glasses check</h1>
+    <p class="quiet">A 2 minute check of what these glasses can do. Move with the Left and Right keys.</p>
+    <div class="mono" id="info"></div>
+  </section>
+
+  <section class="screen" id="s2">
+    <h1>Keys</h1>
+    <p class="quiet">Press each one. It lights up when the page hears it. Try any other control too (tap, swipe, back).</p>
+    <div class="keys" id="keyChips"></div>
+    <div class="mono" id="lastKeys"></div>
+  </section>
+
+  <section class="screen" id="s3">
+    <h1>How dim can it go?</h1>
+    <p class="quiet">Which is the dimmest line you can still read comfortably?</p>
+    <svg width="556" height="330" viewBox="0 0 556 330" aria-hidden="true" id="dimSvg"></svg>
+  </section>
+
+  <section class="screen" id="s4">
+    <h1>Stroke and text size</h1>
+    <p class="quiet">Which thinnest line and smallest text are still easy to read?</p>
+    <svg width="556" height="190" viewBox="0 0 556 190" aria-hidden="true" id="widthSvg"></svg>
+    <div style="font-family:Georgia,serif;line-height:1.5">
+      <div style="font-size:18px">18 px: ma ha la ki ta</div>
+      <div style="font-size:26px">26 px: ma ha la ki ta</div>
+      <div style="font-size:40px">40 px: ma ha la ki ta</div>
+    </div>
+  </section>
+
+  <section class="screen" id="s5">
+    <h1>Sound</h1>
+    <p class="quiet">Press Enter. You should hear 4 short sounds: A, B, C, then a voice saying “mahal kita”.</p>
+    <div class="mono" id="audioLog">Not run yet.</div>
+  </section>
+
+  <section class="screen" id="s6">
+    <h1>Report</h1>
+    <p class="quiet">Please screenshot or record this screen and send it back.</p>
+    <div class="mono" id="report"></div>
+  </section>
+
+  <div id="foot"><span>◀ ▶ move · Enter on Sound</span><span id="pos">1 / 6</span></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var MP3_DATA = 'data:audio/mpeg;base64,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PYcATDAjgLYFANpgCQAwl+LADa1QuBGIQw+AYHD4ojKdziZxQhCMS2ybIRjn+1Hoys623dldmJd9ismS6WZHdGfoJiSqd6ot9F12//NixPgiOqnwAN/OxF2stX0Y8yvRqKDSof6Lekg7BlwYJIra8W0jEsmZvA7FrWWqF/ddrZVqampccdVowqJJgwBMAKAoAkYAgA2mASAQxgIATeYLFDknhZCiJgqQF0YAWBFmAhAFRlDQRPARgyfoiAy2lpZbTU1NTB4xjGkojoYyqrLb3UqOs/RX+z7M12WVEZW21TtS3aGMtOiu3//zYMT/JFKp9UrnysRdN6/l7ojs24iGO2Zft3SqUNPIRSp5q9+lxI0gDUvWHa7//9d/X58/LNdAOADw4A4MAnAAjAEwE4wAkCxMBgBaDBCw8sxKTGBP5gIIzB1AhwwM0EDMCMAmjYEw18lNCEDN6YiDbG9HeprIi0dUpR+jnJrSzdTnOmrTZ0fbOS7vZku13s9n7Dw6jnm1R6WtU//zYsT8I3Kh9Aj+iuR1fd31ohp6TTDqPVgzo5fRWo9FTToq205zxySIVDHBLKkXCoiKTqEm2zC1VbtX9VTBgADGhwNQIAOvGACgLRgHYGuYFwDcGDhiUJjxWDGew4TzmGBBTRgpIKWYGoBrGBEAPRgP4COYCwAVGAkgQyFs4/v76Om9rK1LvlVkfduT8rbm3ZevUraXzGy6GMDGR0//82LE/iZLQeQA/s7gs/d1p2t/90sz4wmpmk0MqbI3lQkRpJZXAq7mUtPBsLCa13LjFfqUk2/9prDqPuoI7pe9HMUABg4MA0MiwJMohdYY2XKTYHIO24U0PKOPOPYREzAJwhQwX0EjMFMBNDATAIAwG0AVMCKAODAdQEIwAkANTPQEF8IBSIbxlbL48ziQO278y/9HEIxdjd+kn7lJ//NixPQiEqHcAKfKqHg4tBDEIoeRlOVXQk52PSp7NJXbZVt/atk9U7V7d8u///0NR9BWz6f9bpLXnfrV3qGnekqwryppF2lOjBCTzAB5oBgXAaG4aAAxEIswrEIxDRs4iNc6p2Awr6M9oMo9loAzmjU1EJI5wSM1ZzkB0z1EKx0woVAQ6h2MJBmaAkAQqZ6kTAiwzbOi5VO1l+Yk7//zYMT7JlKp0ADnxNBbhmKzMO2I1PTMtwjVmtTZ0tmta3l3GzoaCxURUUMhJXHS48ebN/f/9ExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqv/zYsTwInk1tADPdomqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqo=';
+  var $ = function (id) { return document.getElementById(id); };
+  var N = 6, cur = 1;
+  var seen = {};            // key names heard
+  var keyLog = [];
+  var pointerCount = 0, wheelCount = 0;
+  var audio = { A: 'not run', B: 'not run', C: 'not run', D: 'not run' };
+  var net = { file: 'not checked', pack: 'not checked' };
+  var storage = 'not checked';
+  var voices = [];
+
+  function show(n) {
+    cur = Math.max(1, Math.min(N, n));
+    for (var i = 1; i <= N; i++) { $('s' + i).classList.toggle('on', i === cur); }
+    $('pos').textContent = cur + ' / ' + N;
+    if (cur === 6) { renderReport(); }
+  }
+
+  /* ---- screen 1: info ---- */
+  function renderInfo() {
+    var ua = navigator.userAgent || '';
+    $('info').textContent =
+      'Window:  ' + window.innerWidth + ' x ' + window.innerHeight + '\n' +
+      'Pixel ratio: ' + (window.devicePixelRatio || 1) + '\n' +
+      'Screen:  ' + (screen && screen.width) + ' x ' + (screen && screen.height) + '\n' +
+      'Language: ' + (navigator.language || '?') + '\n' +
+      'Touch points: ' + (navigator.maxTouchPoints || 0) + '\n' +
+      'Browser: ' + ua.slice(0, 150);
+  }
+
+  /* ---- screen 2: keys ---- */
+  var WANT = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter'];
+  var chips = {};
+  WANT.forEach(function (k) {
+    var b = document.createElement('b');
+    b.textContent = k.replace('Arrow', '');
+    chips[k] = b;
+    $('keyChips').appendChild(b);
+  });
+  function renderKeys() {
+    $('lastKeys').textContent = keyLog.length ? keyLog.slice(-6).join('\n') : 'Nothing heard yet.';
+  }
+  window.addEventListener('keydown', function (e) {
+    var label = e.key + '  (code ' + e.code + ', keyCode ' + e.keyCode + ')';
+    seen[e.key] = true;
+    keyLog.push(label);
+    if (chips[e.key]) { chips[e.key].classList.add('seen'); }
+    renderKeys();
+    if (e.key === 'ArrowRight') { show(cur + 1); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft') { show(cur - 1); e.preventDefault(); }
+    else if (e.key === 'Enter' && cur === 5) { runAudio(); e.preventDefault(); }
+    else if (e.key.indexOf('Arrow') === 0) { e.preventDefault(); }
+  });
+  ['pointerdown', 'touchstart', 'click'].forEach(function (t) {
+    window.addEventListener(t, function () { pointerCount += 1; }, { passive: true });
+  });
+  window.addEventListener('wheel', function () { wheelCount += 1; }, { passive: true });
+
+  /* ---- screens 3 and 4: drawn samples ---- */
+  var NS = 'http://www.w3.org/2000/svg';
+  function curve(svg, y, width, opacity, label) {
+    var p = document.createElementNS(NS, 'path');
+    p.setAttribute('d', 'M20 ' + (y + 10) + ' C 90 ' + (y - 24) + ', 150 ' + (y + 34) + ', 230 ' + (y - 4) + ' S 330 ' + (y + 28) + ', 420 ' + (y - 6));
+    p.setAttribute('fill', 'none');
+    p.setAttribute('stroke', '#fff');
+    p.setAttribute('stroke-width', width);
+    p.setAttribute('stroke-linecap', 'round');
+    p.setAttribute('opacity', opacity);
+    svg.appendChild(p);
+    var t = document.createElementNS(NS, 'text');
+    t.setAttribute('x', 436); t.setAttribute('y', y + 6);
+    t.setAttribute('fill', '#ccc'); t.setAttribute('font-size', '18');
+    t.textContent = label;
+    svg.appendChild(t);
+  }
+  [1, 0.7, 0.5, 0.35, 0.2, 0.1].forEach(function (o, i) { curve($('dimSvg'), 36 + i * 54, 10, o, Math.round(o * 100) + '%'); });
+  [3, 5, 8, 12, 16].forEach(function (w, i) { curve($('widthSvg'), 24 + i * 36, w, 1, w + ' px'); });
+
+  /* ---- screen 5: sound ---- */
+  function logAudio() {
+    $('audioLog').textContent =
+      'A  built-in MP3:  ' + audio.A + '\n' +
+      'B  hosted MP3:    ' + audio.B + '\n' +
+      'C  beep (WebAudio): ' + audio.C + '\n' +
+      'D  voice (speech): ' + audio.D;
+  }
+  function playEl(key, src, done) {
+    var a = new Audio();
+    var finished = false;
+    function end(msg) { if (finished) { return; } finished = true; audio[key] = msg; logAudio(); setTimeout(done, 300); }
+    a.addEventListener('playing', function () { audio[key] = 'playing'; logAudio(); });
+    a.addEventListener('ended', function () { end('finished'); });
+    a.addEventListener('error', function () { end('ERROR ' + (a.error ? 'code ' + a.error.code : '')); });
+    a.src = src;
+    audio[key] = 'starting'; logAudio();
+    var pr;
+    try { pr = a.play(); } catch (err) { end('BLOCKED ' + err); return; }
+    if (pr && pr.then) { pr.catch(function (err) { end('BLOCKED ' + (err && err.name)); }); }
+    setTimeout(function () { end(audio[key] === 'playing' ? 'started, no end event' : 'TIMEOUT'); }, 4000);
+  }
+  function beep(done) {
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) { audio.C = 'not supported'; logAudio(); return done(); }
+      var ctx = new AC();
+      var osc = ctx.createOscillator(), g = ctx.createGain();
+      osc.frequency.value = 523; g.gain.value = 0.2;
+      osc.connect(g); g.connect(ctx.destination);
+      audio.C = 'starting (' + ctx.state + ')'; logAudio();
+      osc.start(); osc.stop(ctx.currentTime + 0.4);
+      osc.onended = function () { audio.C = 'finished (' + ctx.state + ')'; logAudio(); done(); };
+    } catch (err) { audio.C = 'ERROR ' + err; logAudio(); done(); }
+  }
+  function speak(done) {
+    if (!('speechSynthesis' in window)) { audio.D = 'not supported'; logAudio(); return done(); }
+    try {
+      var u = new SpeechSynthesisUtterance('mahal kita');
+      var tl = voices.filter(function (v) { return /^(fil|tl)/i.test(v.lang); })[0];
+      if (tl) { u.voice = tl; u.lang = tl.lang; }
+      u.onstart = function () { audio.D = 'speaking' + (tl ? ' (' + tl.lang + ')' : ' (no Tagalog voice)'); logAudio(); };
+      u.onend = function () { audio.D = 'finished' + (tl ? ' (' + tl.lang + ')' : ' (default voice)'); logAudio(); done(); };
+      u.onerror = function (ev) { audio.D = 'ERROR ' + (ev && ev.error); logAudio(); done(); };
+      audio.D = 'starting'; logAudio();
+      window.speechSynthesis.speak(u);
+      setTimeout(function () { if (audio.D === 'starting') { audio.D = 'no sound started'; logAudio(); done(); } }, 4000);
+    } catch (err) { audio.D = 'ERROR ' + err; logAudio(); done(); }
+  }
+  var running = false;
+  function runAudio() {
+    if (running) { return; }
+    running = true;
+    playEl('A', MP3_DATA, function () {
+      playEl('B', 'check.mp3', function () {
+        beep(function () { speak(function () { running = false; }); });
+      });
+    });
+  }
+  function loadVoices() {
+    try { voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : []; } catch (e) { voices = []; }
+  }
+  loadVoices();
+  if (window.speechSynthesis && 'onvoiceschanged' in window.speechSynthesis) { window.speechSynthesis.onvoiceschanged = loadVoices; }
+
+  /* ---- background checks (no key press needed) ---- */
+  try { localStorage.setItem('sulat.check', '1'); storage = localStorage.getItem('sulat.check') === '1' ? 'works' : 'failed'; }
+  catch (e) { storage = 'blocked'; }
+  try {
+    fetch('check.mp3', { method: 'GET' }).then(function (r) {
+      net.file = r.status + ' ' + (r.headers.get('content-type') || '?');
+    }).catch(function (e) { net.file = 'FAILED ' + e; });
+    fetch('packs/baybayin.json').then(function (r) { net.pack = r.ok ? 'loads (' + r.status + ')' : 'status ' + r.status; })
+      .catch(function (e) { net.pack = 'FAILED ' + e; });
+  } catch (e) { net.file = net.pack = 'fetch unavailable'; }
+
+  /* ---- screen 6: report ---- */
+  function renderReport() {
+    loadVoices();
+    var tl = voices.filter(function (v) { return /^(fil|tl)/i.test(v.lang); }).map(function (v) { return v.name + ' ' + v.lang; });
+    var heard = Object.keys(seen);
+    $('report').textContent =
+      'View ' + window.innerWidth + 'x' + window.innerHeight + ' @' + (window.devicePixelRatio || 1) + 'x\n' +
+      'Keys heard: ' + (heard.length ? heard.join(', ') : 'none') + '\n' +
+      'Taps/clicks: ' + pointerCount + '   Scroll: ' + wheelCount + '\n' +
+      'Sound A ' + audio.A + '\n' +
+      'Sound B ' + audio.B + '\n' +
+      'Sound C ' + audio.C + '\n' +
+      'Sound D ' + audio.D + '\n' +
+      'Voices: ' + voices.length + (tl.length ? '  Tagalog: ' + tl.join('; ') : '  Tagalog: none') + '\n' +
+      'MP3 file fetch: ' + net.file + '\n' +
+      'Stroke pack fetch: ' + net.pack + '\n' +
+      'Storage: ' + storage;
+  }
+
+  renderInfo(); renderKeys(); logAudio();
+  window.addEventListener('resize', renderInfo);
+  window.SulatGlassesCheck = { show: show, runAudio: runAudio, renderReport: renderReport };
+})();
+</script>
+</body>
+</html>
