@@ -76,6 +76,8 @@ What changed in the design: Spark is never asked which glyph it's looking at. Th
 - Transcription (Muse Voice Transcribe): 0.8 to 1.3 s.
 - Working out the phrase (Muse Spark 1.3 with a `start_lesson` tool): setting reasoning effort to "low" cut a new translation from about 3.4 s to 1.4 s (3 runs each), with the same answer every time.
 
+**Paper mode, live**, Nov 2. Thin pen on grey paper was invisible to the model once shrunk: 3 of 3 photos came back "looks blank". A clean-up step (find the ink against the local paper brightness, crop to the letter, redraw it bold on white) fixed it. Then 7 live judgments were all correct: neat and loose ma passed, ki and a dotless ka sent as ma were sent back. One failed until the token budget went from 3,000 to 6,000, because Spark spends 1,400 to 2,500 tokens reasoning per photo. Each judgment takes 6 to 11 seconds. One tip named the wrong letter ("reads as ha", it was ka), so tips can no longer name other letters.
+
 ## Built during the event
 
 - **With Claude (Anthropic):** the hello page, the stroke-capture page, the Sulat engine (`sulat-engine.js`), the Show me page, the stroke scorer (`sulat-score.js`), the practice page, the glasses views and diagnostic page, the test suite, and the glyph review sheet.
