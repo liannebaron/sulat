@@ -37,7 +37,8 @@ I'm a hand-letterer, but I'm still learning Baybayin myself. Every glyph and str
 - Oct 28, 2026: repo created, hello page live at sulat-7sw.pages.dev, stroke-capture page added (`capture.html`)
 - Oct 29, 2026: all 20 glyphs and 3 marks recorded by hand (`packs/baybayin.json`); Sulat engine and Show me page (`animate.html`); first Spark vision test on paper
 - Oct 31, 2026: voice input (`talk.html`, `functions/api/`): speech to Tagalog phrase to Show me, working end to end on a phone
-- Oct 31: confirmed on real Ray-Ban Display glasses (Pavlo’s pair): smooth stroke animation, Band input as arrow keys and Select.
+- Oct 31, 2026: confirmed on real Ray-Ban Display glasses (Pavlo’s pair): smooth stroke animation, Band input as arrow keys and Select.
+- Nov 1, 2026: removed a pen-landing hook from ka stroke 3 and the cross mark. Found by the family study: all three learners needed exactly 3 tries to trace ki because the guide arrow pointed the wrong way.
 
 ## Evaluation log
 
