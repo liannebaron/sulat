@@ -347,7 +347,7 @@
   // path as a held photo, then posts the verdict back to the room.
   var roomInput = $('room'), deskBtn = $('desk'), preview = $('preview');
   var deskStatusEl = $('deskStatus');
-  var desk = { on: false, timer: 0, lastCmd: null, stream: null, lock: null, working: false };
+  var desk = { on: false, timer: 0, lastCmd: null, skipFirst: false, stream: null, lock: null, working: false };
 
   function dsay(msg, isError) {
     deskStatusEl.textContent = msg;
@@ -374,6 +374,7 @@
     try { preview.srcObject = null; } catch (e) { /* older browser */ }
     deskBtn.textContent = 'Use as desk camera';
     desk.lastCmd = null;
+    desk.skipFirst = false;
     if (!silent) { dsay('Desk camera off.'); }
   }
 
@@ -386,7 +387,7 @@
       return;
     }
     dsay('Starting the camera…');
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false }).then(function (s) {
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }).then(function (s) {
       desk.stream = s;
       preview.srcObject = s;
       preview.hidden = false;
@@ -396,6 +397,7 @@
     }).then(function () {
       desk.on = true;
       desk.lastCmd = null;
+      desk.skipFirst = true;
       deskBtn.textContent = 'Stop desk camera';
       if (desk.timer) { clearInterval(desk.timer); }
       desk.timer = setInterval(function () { pollRoom(code); }, 1000);
@@ -424,6 +426,7 @@
     }).then(function (room) {
       if (!desk.on || !room || !room.command || room.command.id === desk.lastCmd) { return; }
       desk.lastCmd = room.command.id;
+      if (desk.skipFirst) { desk.skipFirst = false; return; } // that command predates desk mode: record it, don't check it
       handleCommand(code, room.command);
     }).catch(function () { /* the next tick retries */ });
   }
@@ -436,17 +439,36 @@
     }).catch(function () { /* the glasses time out with their own message */ });
   }
 
+  function cameraLive() {
+    return !!(desk.stream && desk.stream.getTracks().some(function (t) { return t.readyState === 'live'; }));
+  }
+
+  function answerCommand(code, cmd, verdict, tips, ms) {
+    var found = { verdict: verdict, tips: tips, ms: ms };
+    showResult(found);
+    return postResult(code, cmd.id, found.verdict, found.tips, found.ms);
+  }
+
   function handleCommand(code, cmd) {
     desk.working = true;
     dsay('Checking "' + cmd.target + '"…');
-    if (!pack || !preview.videoWidth || !oneToken(cmd.target)) {
+    var t0 = Date.now();
+    var RETRY_TIP = 'I couldn’t check that one. Press Check again.';
+    if (!pack || !oneToken(cmd.target)) {
+      answerCommand(code, cmd, 'retry', [RETRY_TIP], Date.now() - t0);
+      dsay('Could not check that one.', true);
       desk.working = false;
-      dsay('Could not check that one. The glasses will ask again.', true);
       return;
     }
-    var t0 = Date.now();
+    if (!cameraLive()) {
+      stopDesk(true);
+      answerCommand(code, cmd, 'retry', [RETRY_TIP], Date.now() - t0);
+      dsay('The phone camera stopped. Tap Use as desk camera again.', true);
+      desk.working = false;
+      return;
+    }
     var cleaned = null;
-    try { cleaned = SulatPhoto.clean(preview); } catch (e) { cleaned = null; }
+    try { cleaned = preview.videoWidth ? SulatPhoto.clean(preview) : null; } catch (e) { cleaned = null; }
     var noshow = { verdict: 'retry', tips: ['I couldn’t see your writing. Write darker and keep the paper in view.'], ms: Date.now() - t0 };
     if (!cleaned) {
       showResult(noshow);
@@ -467,11 +489,20 @@
       showResult(found);
       return postResult(code, cmd.id, found.verdict, found.tips || [], found.ms == null ? 0 : found.ms);
     }).catch(function (err) {
+      answerCommand(code, cmd, 'retry', ['I couldn’t check that one. Press Check again.'], Date.now() - t0);
       dsay('Something went wrong: ' + err.message, true);
     }).then(function () {
       desk.working = false;
     });
   }
+
+  // The lock is released when the page hides; ask again on return while on duty.
+  document.addEventListener('visibilitychange', function () {
+    if (!desk.on || document.hidden) { return; }
+    if (navigator.wakeLock && navigator.wakeLock.request) {
+      navigator.wakeLock.request('screen').then(function (l) { desk.lock = l; }).catch(function () {});
+    }
+  });
 
   CHIPS.forEach(function (text) {
     var b = document.createElement('button');
