@@ -105,7 +105,8 @@
     }
     var cs = Math.max(C.x1 - C.x0, C.y1 - C.y0);
     for (k = 1; k <= n; k++) {
-      if (keep[k] || sizes[k] < 6) { continue; }
+      // A real vowel dot is a solid blob; a fleck of dust or a pen tap is tiny. Ignore the tiny ones.
+      if (keep[k] || sizes[k] < Math.max(6, 0.006 * big)) { continue; }
       var b2 = boxes[k], cy = (b2.y0 + b2.y1) / 2, cx = (b2.x0 + b2.x1) / 2;
       var ddy = Math.max(C.y0 - cy, 0, cy - C.y1), ddx = Math.max(C.x0 - cx, 0, cx - C.x1);
       if (Math.max(ddx, ddy) < 0.35 * cs) { keep[k] = 1; }

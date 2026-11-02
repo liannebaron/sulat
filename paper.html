@@ -59,9 +59,11 @@
   .tip { margin: 0 0 10px; color: var(--quiet); }
   #status { min-height: 1.4em; margin: 10px 0 0; color: var(--quiet); }
   #status.error { color: var(--warn); }
-  #seenWrap { margin-top: 12px; }
-  #seenWrap figcaption { margin-top: 6px; color: var(--quiet); font-size: 14px; }
-  #seen { display: block; width: 100%; max-width: 240px; height: auto; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+  .compare { display: flex; gap: 12px; margin-top: 12px; }
+  .compare figure { flex: 1 1 0; min-width: 0; margin: 0; }
+  .compare figcaption { margin-top: 6px; color: var(--quiet); font-size: 14px; }
+  .compare img { display: block; width: 100%; aspect-ratio: 1 / 1; object-fit: contain; background: #fff; border: 1px solid var(--line); border-radius: 10px; }
+  @media (max-width: 480px) { .compare { flex-direction: column; } }
   #verdict { margin: 0 0 6px; font: 400 26px Georgia, "Times New Roman", serif; }
   #verdict.good { color: var(--good); }
   #tips { margin: 6px 0 0; padding-left: 20px; }
@@ -81,14 +83,20 @@
     <div class="chips" id="chips"></div>
     <p class="tip">Use a dark pen, write big, and fill the frame.</p>
     <div class="row">
-      <label class="filebtn" for="photo">Take a photo</label>
+      <label class="filebtn" id="photoLabel" for="photo">Take a photo</label>
       <input id="photo" type="file" accept="image/*" capture="environment" hidden>
       <button id="check" type="button" class="primary">Check my writing</button>
     </div>
-    <figure id="seenWrap" hidden style="margin-left:0;margin-right:0">
-      <img id="seen" alt="Cleaned photo of your handwriting">
-      <figcaption>What Sulat sees</figcaption>
-    </figure>
+    <div class="compare">
+      <figure id="seenWrap" hidden>
+        <img id="seen" alt="Cleaned photo of your handwriting">
+        <figcaption>What Sulat sees</figcaption>
+      </figure>
+      <figure id="refWrap" hidden>
+        <img id="ref" alt="Reference glyph">
+        <figcaption>Reference</figcaption>
+      </figure>
+    </div>
     <p id="status" role="status" aria-live="polite"></p>
   </section>
 
@@ -109,6 +117,8 @@
   var sylInput = $('syl'), photoInput = $('photo'), checkBtn = $('check');
   var seenWrap = $('seenWrap'), seen = $('seen'), statusEl = $('status');
   var result = $('result'), verdictEl = $('verdict'), tipsEl = $('tips'), timingsEl = $('timings');
+  var photoLabel = $('photoLabel'), refWrap = $('refWrap'), refImg = $('ref');
+  var refCache = null; // { target, url } — the reference also sent to the API
 
   var CHIPS = ['ma', 'ka', 'ki', 'ta', 'sa', 'la'];
   var pack = null;
@@ -164,7 +174,34 @@
     cleaned = out;
     seen.src = out.dataURL;
     seenWrap.hidden = false;
+    photoLabel.textContent = 'Retake photo';
     say('Ready. Press “Check my writing”.');
+  }
+
+  // Shows the reference (the same image sent to the API) as soon as a syllable is chosen.
+  function refreshReference() {
+    if (!pack) { return; }
+    var target = (sylInput.value || '').trim().toLowerCase();
+    if (!oneToken(target)) {
+      refWrap.hidden = true;
+      refCache = null;
+      return;
+    }
+    renderReference(target).then(function (url) {
+      if ((sylInput.value || '').trim().toLowerCase() !== target) { return; }
+      refCache = { target: target, url: url };
+      refImg.src = url;
+      refWrap.hidden = false;
+    }).catch(function () {
+      refWrap.hidden = true;
+      refCache = null;
+    });
+  }
+
+  function onSyllableChanged() {
+    photoLabel.textContent = 'Take a photo';
+    result.hidden = true;
+    refreshReference();
   }
 
   // Draws the target syllable with the engine onto a solid white canvas: JPEG.
@@ -254,7 +291,15 @@
     checkBtn.disabled = true;
     say('Thinking…');
     result.hidden = true;
-    renderReference(target).then(function (refURL) {
+    var refP = (refCache && refCache.target === target)
+      ? Promise.resolve(refCache.url)
+      : renderReference(target).then(function (refURL) {
+        refCache = { target: target, url: refURL };
+        refImg.src = refURL;
+        refWrap.hidden = false;
+        return refURL;
+      });
+    refP.then(function (refURL) {
       return fetch('/api/paper', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -284,12 +329,15 @@
       for (var i = 0; i < all.length; i++) {
         all[i].setAttribute('aria-pressed', all[i].textContent === text ? 'true' : 'false');
       }
+      onSyllableChanged();
     });
     $('chips').appendChild(b);
   });
+  sylInput.addEventListener('change', onSyllableChanged);
 
   Sulat.loadPack('packs/baybayin.json').then(function (p) {
     pack = p;
+    refreshReference();
   }).catch(function (err) {
     say('Couldn’t load the stroke pack. Open this page from your Sulat site. (' + err.message + ')', true);
   });
