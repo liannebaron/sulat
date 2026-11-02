@@ -17,6 +17,7 @@ var VOWEL_GLYPH = { a: 'a', e: 'i', i: 'i', o: 'u', u: 'u' };
 var VOWEL_MARK = { a: null, e: 'mark-i', i: 'mark-i', o: 'mark-u', u: 'mark-u' };
 var FOLD = { c: 'k', f: 'p', v: 'b', j: 'dy', q: 'k', x: 'ks', z: 's' };
 var BASE_GLYPHS = ['a', 'i', 'u', 'ba', 'ka', 'da', 'ga', 'ha', 'la', 'ma', 'na', 'nga', 'pa', 'sa', 'ta', 'wa', 'ya'];
+var NAMED_SYLLABLES = ['ba', 'ka', 'da', 'ga', 'ha', 'la', 'ma', 'na', 'nga', 'pa', 'sa', 'ta', 'wa', 'ya'];
 
 function syllabifyOne(word) {
   var s = String(word || '').toLowerCase();
@@ -61,7 +62,7 @@ function cleanB64(s) {
   return s.replace(/\s+/g, '');
 }
 
-function parseVerdict(text) {
+function parseVerdict(text, target) {
   var t = String(text || '').replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
   var start = t.indexOf('{'), end = t.lastIndexOf('}');
   if (start < 0 || end <= start) { return null; }
@@ -69,9 +70,14 @@ function parseVerdict(text) {
   try { obj = JSON.parse(t.slice(start, end + 1)); } catch (e) { return null; }
   if (!obj || (obj.verdict !== 'good' && obj.verdict !== 'almost' && obj.verdict !== 'retry')) { return null; }
   var banned = /\b(order|direction|clockwise|stroke count|number of strokes|how many strokes)\b/i;
+  var others = NAMED_SYLLABLES.filter(function (s) { return s !== String(target || '').toLowerCase(); });
+  var named = new RegExp('\\b(' + others.join('|') + ')\\b', 'i');
   var tips = Array.isArray(obj.tips)
-    ? obj.tips.filter(function (x) { return typeof x === 'string' && x.trim() && !banned.test(x); }).slice(0, 2)
+    ? obj.tips.filter(function (x) { return typeof x === 'string' && x.trim() && !banned.test(x) && !named.test(x); }).slice(0, 2)
     : [];
+  if (obj.verdict === 'retry' && tips.length === 0) {
+    tips = ['This looks like a different letter. Compare it with the reference.'];
+  }
   return { verdict: obj.verdict, tips: tips };
 }
 
@@ -110,6 +116,7 @@ export async function onRequestPost(context) {
     'If it reads as a different Baybayin character, the verdict is retry and the tip says it looks like a different letter. ' +
     'The one thing that must be right is the vowel mark, because it changes the sound. ' +
     'Be kind and specific. Never mention stroke order, stroke direction, or stroke count. ' +
+    'Never say which letter it looks like, and never name any syllable other than the target. ' +
     'Reply with JSON only: {"verdict": "good" | "almost" | "retry", "tips": ["...", "..."]}, ' +
     'with at most 2 short tips. No other text. ' +
     'Verdicts: "good" means it clearly reads as the target with the right mark. ' +
@@ -176,7 +183,7 @@ export async function onRequestPost(context) {
       }).join('\n');
     }
   }
-  var parsed = parseVerdict(content);
+  var parsed = parseVerdict(content, target.toLowerCase());
   if (!parsed) {
     // TODO: remove the debug text before going public.
     return Response.json({

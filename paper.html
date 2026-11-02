@@ -1,0 +1,299 @@
+<!-- Built with Muse Code. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sulat · Paper check</title>
+<style>
+  :root {
+    --page: #eceff3;
+    --card: #ffffff;
+    --ink: #14161a;
+    --quiet: #5d6572;
+    --line: #d9dde3;
+    --accent: #1f3a8a;
+    --good: #1f7a4d;
+    --warn: #9a3b12;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; overscroll-behavior: none; }
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 16px;
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+  }
+  h1 { margin: 4px 0 2px; font: 400 30px Georgia, "Times New Roman", serif; }
+  h2 { margin: 0 0 8px; font: 400 24px Georgia, "Times New Roman", serif; }
+  .lede { margin: 0 0 16px; color: var(--quiet); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 4px; }
+  .chips button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--accent); border-color: var(--accent); }
+  button, .filebtn {
+    font: inherit;
+    min-height: 48px;
+    padding: 0 18px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink);
+    cursor: pointer;
+    touch-action: manipulation;
+    display: inline-flex;
+    align-items: center;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button:focus-visible, input:focus-visible, .filebtn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  input[type="text"] { min-height: 44px; padding: 0 12px; font: inherit; border: 1px solid var(--line); border-radius: 10px; width: 100%; max-width: 280px; }
+  label.field { display: block; margin: 14px 0 6px; color: var(--quiet); }
+  .tip { margin: 0 0 10px; color: var(--quiet); }
+  #status { min-height: 1.4em; margin: 10px 0 0; color: var(--quiet); }
+  #status.error { color: var(--warn); }
+  #seenWrap { margin-top: 12px; }
+  #seenWrap figcaption { margin-top: 6px; color: var(--quiet); font-size: 14px; }
+  #seen { display: block; width: 100%; max-width: 240px; height: auto; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+  #verdict { margin: 0 0 6px; font: 400 26px Georgia, "Times New Roman", serif; }
+  #verdict.good { color: var(--good); }
+  #tips { margin: 6px 0 0; padding-left: 20px; }
+  #tips li { margin-bottom: 4px; }
+  #timings { margin: 12px 0 0; color: var(--quiet); font-size: 14px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Paper check</h1>
+  <p class="lede">Write one Baybayin syllable on paper, photograph it, and Sulat tells you what to fix.</p>
+
+  <section class="card">
+    <label class="field" for="syl">Syllable</label>
+    <input id="syl" type="text" value="ma" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="8">
+    <div class="chips" id="chips"></div>
+    <p class="tip">Use a dark pen, write big, and fill the frame.</p>
+    <div class="row">
+      <label class="filebtn" for="photo">Take a photo</label>
+      <input id="photo" type="file" accept="image/*" capture="environment" hidden>
+      <button id="check" type="button" class="primary">Check my writing</button>
+    </div>
+    <figure id="seenWrap" hidden style="margin-left:0;margin-right:0">
+      <img id="seen" alt="Cleaned photo of your handwriting">
+      <figcaption>What Sulat sees</figcaption>
+    </figure>
+    <p id="status" role="status" aria-live="polite"></p>
+  </section>
+
+  <section class="card" id="result" hidden>
+    <h2 id="verdict"></h2>
+    <ul id="tips"></ul>
+    <p id="timings"></p>
+  </section>
+</div>
+
+<script src="sulat-engine.js"></script>
+<script src="sulat-photo.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+  var sylInput = $('syl'), photoInput = $('photo'), checkBtn = $('check');
+  var seenWrap = $('seenWrap'), seen = $('seen'), statusEl = $('status');
+  var result = $('result'), verdictEl = $('verdict'), tipsEl = $('tips'), timingsEl = $('timings');
+
+  var CHIPS = ['ma', 'ka', 'ki', 'ta', 'sa', 'la'];
+  var pack = null;
+  var cleaned = null; // { canvas, dataURL } from SulatPhoto.clean
+  var busy = false;
+
+  function say(msg, isError) {
+    statusEl.textContent = msg;
+    statusEl.classList.toggle('error', !!isError);
+  }
+
+  function oneToken(text) {
+    var words = Sulat.syllabify(text);
+    var tokens = [];
+    words.forEach(function (w) { w.tokens.forEach(function (t) { tokens.push(t); }); });
+    return tokens.length === 1 ? tokens[0] : null;
+  }
+
+  function loadImage(file) {
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () { URL.revokeObjectURL(url); resolve(img); };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('bad-image')); };
+      img.src = url;
+    });
+  }
+
+  photoInput.addEventListener('change', function () {
+    var f = photoInput.files && photoInput.files[0];
+    cleaned = null;
+    seenWrap.hidden = true;
+    result.hidden = true;
+    if (!f) { return; }
+    say('Cleaning up your photo…');
+    // Let the status paint before the heavy clean-up runs.
+    setTimeout(function () {
+      loadImage(f).then(function (img) {
+        var out = null;
+        try { out = SulatPhoto.clean(img); } catch (e) { out = null; }
+        finishClean(out);
+      }).catch(function () {
+        say('That photo couldn’t be read. Try again.', true);
+      });
+    }, 30);
+  });
+
+  function finishClean(out) {
+    if (!out) {
+      say('I couldn’t find your writing. Try a darker pen, good light, and fill the frame.', true);
+      return;
+    }
+    cleaned = out;
+    seen.src = out.dataURL;
+    seenWrap.hidden = false;
+    say('Ready. Press “Check my writing”.');
+  }
+
+  // Draws the target syllable with the engine onto a solid white canvas: JPEG.
+  function renderReference(target) {
+    var words = Sulat.syllabify(target);
+    var lay = Sulat.layout(pack, words, { pad: 110 });
+    var host = document.createElement('div');
+    host.setAttribute('style', 'position:absolute;left:-9999px;top:0;');
+    document.body.appendChild(host);
+    var ctrl;
+    try {
+      ctrl = Sulat.render(host, pack, lay, { ink: 26, dotInk: 38, ariaLabel: target + ' reference' });
+      ctrl.showAll();
+      var W = 768;
+      var H = Math.round(W * lay.viewBox[3] / lay.viewBox[2]);
+      ctrl.svg.setAttribute('width', W);
+      ctrl.svg.setAttribute('height', H);
+      var xml = new XMLSerializer().serializeToString(ctrl.svg);
+      var url = URL.createObjectURL(new Blob([xml], { type: 'image/svg+xml' }));
+      return new Promise(function (resolve, reject) {
+        var img = new Image();
+        img.onload = function () {
+          URL.revokeObjectURL(url);
+          var c = document.createElement('canvas');
+          c.width = W; c.height = H;
+          var cx = c.getContext('2d');
+          cx.fillStyle = '#fff';
+          cx.fillRect(0, 0, W, H);
+          cx.drawImage(img, 0, 0, W, H);
+          host.parentNode.removeChild(host);
+          resolve(c.toDataURL('image/jpeg', 0.92));
+        };
+        img.onerror = function () {
+          URL.revokeObjectURL(url);
+          if (host.parentNode) { host.parentNode.removeChild(host); }
+          reject(new Error('bad-reference'));
+        };
+        img.src = url;
+      });
+    } catch (e) {
+      if (host.parentNode) { host.parentNode.removeChild(host); }
+      return Promise.reject(e);
+    }
+  }
+
+  function readError(res, fallback) {
+    return res.json().then(function (j) {
+      return new Error((j && (j.error || (j.detail ? j.error + ' ' + j.detail : null))) || fallback);
+    }).catch(function () {
+      return new Error(fallback + ' (' + res.status + ')');
+    });
+  }
+
+  function showResult(found) {
+    result.hidden = false;
+    verdictEl.className = '';
+    tipsEl.innerHTML = '';
+    if (found.verdict === 'good') {
+      verdictEl.textContent = 'Looks right!';
+      verdictEl.className = 'good';
+    } else if (found.verdict === 'almost') {
+      verdictEl.textContent = 'Almost there';
+    } else {
+      verdictEl.textContent = 'Try again';
+    }
+    (found.tips || []).forEach(function (t) {
+      var li = document.createElement('li');
+      li.textContent = t;
+      tipsEl.appendChild(li);
+    });
+    timingsEl.textContent = found.ms != null ? 'Feedback in ' + found.ms + ' ms' : '';
+    say('');
+  }
+
+  checkBtn.addEventListener('click', function () {
+    if (busy || !pack) { return; }
+    var target = (sylInput.value || '').trim().toLowerCase();
+    if (!oneToken(target)) {
+      say('Type one syllable, e.g. ki.', true);
+      return;
+    }
+    if (!cleaned) {
+      say('Take a photo first. If the camera didn’t open, check camera permission and try again.', true);
+      return;
+    }
+    busy = true;
+    checkBtn.disabled = true;
+    say('Thinking…');
+    result.hidden = true;
+    renderReference(target).then(function (refURL) {
+      return fetch('/api/paper', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target: target, photo: cleaned.dataURL, reference: refURL })
+      }).then(function (res) {
+        if (!res.ok) { return readError(res, 'Paper check failed').then(function (e) { throw e; }); }
+        return res.json();
+      });
+    }).then(function (found) {
+      showResult(found);
+    }).catch(function (err) {
+      say('Something went wrong: ' + err.message, true);
+    }).then(function () {
+      busy = false;
+      checkBtn.disabled = false;
+    });
+  });
+
+  CHIPS.forEach(function (text) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = text;
+    b.setAttribute('aria-pressed', text === sylInput.value.trim().toLowerCase() ? 'true' : 'false');
+    b.addEventListener('click', function () {
+      sylInput.value = text;
+      var all = $('chips').children;
+      for (var i = 0; i < all.length; i++) {
+        all[i].setAttribute('aria-pressed', all[i].textContent === text ? 'true' : 'false');
+      }
+    });
+    $('chips').appendChild(b);
+  });
+
+  Sulat.loadPack('packs/baybayin.json').then(function (p) {
+    pack = p;
+  }).catch(function (err) {
+    say('Couldn’t load the stroke pack. Open this page from your Sulat site. (' + err.message + ')', true);
+  });
+})();
+</script>
+</body>
+</html>
