@@ -12,6 +12,8 @@ I'm Filipino-Canadian, and I'm learning Baybayin before I get my next tattoo. I 
 
 I'm not the only one. Baybayin is having a revival, especially among second-generation Filipinos in the diaspora, but mostly as tattoos and designs that people can't actually read or write. Sulat teaches the hand, not just the eye.
 
+Glyphs drawn by me, a learner, and reviewed by a Baybayin calligrapher (see Accuracy and review)
+
 ## How it works
 
 1. Ask out loud: "How do I write I love you?"
@@ -31,6 +33,14 @@ It's built for a phone and for Meta Ray-Ban Display glasses.
 ## Learner-built, expert-reviewed
 
 I'm a hand-letterer, but I'm still learning Baybayin myself. Every glyph and stroke in this project is drawn in my own hand, so a Baybayin calligrapher has agreed to review them. I'll credit them here once their review is in.
+
+## Accuracy and review
+
+The glyphs in Sulat are hand-drawn by me, a learner. On Nov 2, 2026, Baybayin calligrapher [Taipan Lucero] reviewed the glyph sheet, called the glyphs a 'good starting point', and advised that strict stroke order isn't needed as long as characters stay similar enough to the historically recorded forms and distinguishable from each other.
+
+This was a general review of the sheet, not a full audit of every glyph and not an endorsement of the app. 
+
+His advice changed the app. The scorer (legible-1) now judges whether a character is clear and distinguishable, and treats stroke order, direction and stroke count as optional tips. The earlier strict scorer is kept (`opts.strict`) and is the version the Nov 1 family study ran on.
 
 ## Status
 
