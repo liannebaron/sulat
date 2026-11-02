@@ -267,10 +267,25 @@
       ariaLabel: u.tok.text + ' in Baybayin'
     });
     ctrl.play({ speed: speed });
-    $('lensReplay').focus();
+    setLensUI();
   }
 
   function replay() { if (ctrl) { ctrl.play({ speed: speed }); } }
+
+  // Built with Muse Code: the Replay button follows the lens mode, so Enter
+  // (or Neural Band Select) always presses the focused button for this screen.
+  function setLensUI() {
+    var b = $('lensReplay');
+    if (lensMode === 'checking') { b.textContent = 'Checking…'; b.disabled = true; }
+    else {
+      b.disabled = false;
+      b.textContent = lensMode === 'try' ? 'Check' : (lensMode === 'verdict' ? 'Check again' : 'Replay');
+    }
+    $('lensHint').innerHTML = lensMode === 'show'
+      ? '← → next letter · ↓ try on paper<br>↑ back to phrases'
+      : (lensMode === 'verdict' ? '→ next letter · ← Show me again' : '← back to Show me');
+    b.focus();
+  }
 
   // "Now you try" for the current syllable: the learner writes on paper under
   // the desk camera and presses to check. Enter posts a capture command; the
@@ -295,12 +310,14 @@
     $('lensWord').textContent = 'Write ' + text + ' on paper';
     $('lensCount').textContent = 'Phone code: ' + roomCode;
     $('lensNote').textContent = 'Press to check';
+    setLensUI();
   }
 
   function postCapture(text) {
     lensMode = 'checking';
     clearTimeout(lensTimer);
     $('lensNote').textContent = 'Checking…';
+    setLensUI();
     fetch('/api/room', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -315,6 +332,7 @@
     }).catch(function () {
       lensMode = 'try';
       $('lensNote').textContent = 'Room unreachable. Enter to try again.';
+      setLensUI();
     });
   }
 
@@ -325,22 +343,26 @@
       $('lensNote').textContent = 'No answer from the phone. Is desk camera on?';
       return;
     }
+    var want = pendingCmd ? pendingCmd.id : null;
     lensTimer = setTimeout(function () {
       fetch('/api/room?code=' + encodeURIComponent(roomCode), { cache: 'no-store' }).then(function (res) {
         return res.ok ? res.json() : null;
       }).then(function (room) {
-        if (room && room.result && room.result.id === pendingCmd.id) { showVerdict(room.result); }
+        if (lensMode !== 'checking' || !pendingCmd || pendingCmd.id !== want) { return; }
+        if (room && room.result && room.result.id === want) { showVerdict(room.result); }
         else { pollLens(left - 1); }
-      }).catch(function () { pollLens(left - 1); });
+      }).catch(function () { if (lensMode === 'checking') { pollLens(left - 1); } });
     }, 1000);
   }
 
   function showVerdict(found) {
+    if (lensMode !== 'checking') { return; }
     clearTimeout(lensTimer);
     lensMode = 'verdict';
     $('lensWord').textContent = found.verdict === 'good' ? 'Magaling!'
       : (found.verdict === 'almost' ? 'Almost' : 'Try again');
     $('lensNote').textContent = (found.tips && found.tips[0]) || '';
+    setLensUI();
   }
 
   function go(url) {
@@ -361,7 +383,14 @@
 
   $('go').addEventListener('click', renderPhrase);
   $('replay').addEventListener('click', replay);
-  $('lensReplay').addEventListener('click', replay);
+  $('lensReplay').addEventListener('click', function () {
+    if (lensMode === 'show') { replay(); }
+    else if (lensMode === 'checking') { /* ignore while checking */ }
+    else {
+      var text = currentTok() || tryTok;
+      if (text) { postCapture(text); }
+    }
+  });
   $('slow').addEventListener('click', function () {
     speed = speed < 1 ? 1 : 0.55;
     $('slow').setAttribute('aria-pressed', speed < 1 ? 'true' : 'false');
@@ -384,10 +413,11 @@
         renderLensUnit();
       }
       else if (e.key === 'ArrowDown') { e.preventDefault(); openTry(); }
-      else if (e.key === 'ArrowUp') { e.preventDefault(); go('index.html'); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); if (lensMode === 'show') { go('index.html'); } else { renderLensUnit(); } }
       else if ((e.key === 'Enter' || e.key === ' ') && e.target !== $('lensReplay')) {
         e.preventDefault();
         if (lensMode === 'show') { replay(); }
+        else if (lensMode === 'checking') { /* ignore while checking */ }
         else {
           var text = currentTok() || tryTok;
           if (text) { postCapture(text); }
