@@ -59,6 +59,9 @@
   .tip { margin: 0 0 10px; color: var(--quiet); }
   #status { min-height: 1.4em; margin: 10px 0 0; color: var(--quiet); }
   #status.error { color: var(--warn); }
+  #deskStatus { min-height: 1.4em; margin: 10px 0 0; color: var(--quiet); }
+  #deskStatus.error { color: var(--warn); }
+  #preview { display: block; width: 100%; max-width: 320px; height: auto; margin-top: 12px; border: 1px solid var(--line); border-radius: 10px; background: #000; }
   .compare { display: flex; gap: 12px; margin-top: 12px; }
   .compare figure { flex: 1 1 0; min-width: 0; max-width: 180px; margin: 0; }
   .compare figcaption { margin-top: 6px; color: var(--quiet); font-size: 14px; }
@@ -87,6 +90,18 @@
       <input id="photo" type="file" accept="image/*" capture="environment" hidden>
       <button id="check" type="button" class="primary">Check my writing</button>
     </div>
+  </section>
+
+  <section class="card">
+    <h2>Desk camera</h2>
+    <p class="tip">Put this phone on a stand above the paper, facing down at your writing. The glasses will ask it to check.</p>
+    <label class="field" for="room">Room code (shown in the glasses)</label>
+    <input id="room" type="text" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="8" placeholder="e.g. 4821">
+    <div class="row" style="margin-top:14px">
+      <button id="desk" type="button">Use as desk camera</button>
+    </div>
+    <video id="preview" playsinline muted hidden></video>
+    <p id="deskStatus" role="status" aria-live="polite"></p>
   </section>
 
   <section class="card" id="result" hidden>
@@ -325,6 +340,138 @@
       checkBtn.disabled = false;
     });
   });
+
+  // Built with Muse Code: desk-camera mode for the glasses loop.
+  // Photo mode above is unchanged. The desk camera polls the shared room,
+  // and each new capture command runs the same clean -> reference -> /api/paper
+  // path as a held photo, then posts the verdict back to the room.
+  var roomInput = $('room'), deskBtn = $('desk'), preview = $('preview');
+  var deskStatusEl = $('deskStatus');
+  var desk = { on: false, timer: 0, lastCmd: null, stream: null, lock: null, working: false };
+
+  function dsay(msg, isError) {
+    deskStatusEl.textContent = msg;
+    deskStatusEl.classList.toggle('error', !!isError);
+  }
+
+  var roomParams = new URLSearchParams(window.location.search);
+  if (roomParams.get('room')) { roomInput.value = roomParams.get('room'); }
+
+  function roomCode() {
+    var c = (roomInput.value || '').trim().toUpperCase();
+    return /^[A-Z0-9]{4,8}$/.test(c) ? c : null;
+  }
+
+  function stopDesk(silent) {
+    desk.on = false;
+    if (desk.timer) { clearInterval(desk.timer); desk.timer = 0; }
+    if (desk.stream) {
+      desk.stream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) { /* already stopped */ } });
+      desk.stream = null;
+    }
+    if (desk.lock) { try { desk.lock.release(); } catch (e) { /* already released */ } desk.lock = null; }
+    preview.hidden = true;
+    try { preview.srcObject = null; } catch (e) { /* older browser */ }
+    deskBtn.textContent = 'Use as desk camera';
+    desk.lastCmd = null;
+    if (!silent) { dsay('Desk camera off.'); }
+  }
+
+  function startDesk() {
+    var code = roomCode();
+    if (!code) { dsay('Type the room code shown in the glasses.', true); return; }
+    if (!pack) { dsay('The stroke pack is not loaded yet. Wait a moment and try again.', true); return; }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      dsay('This browser cannot open the camera. Try iPhone Safari or Chrome.', true);
+      return;
+    }
+    dsay('Starting the camera…');
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false }).then(function (s) {
+      desk.stream = s;
+      preview.srcObject = s;
+      preview.hidden = false;
+      var played = null;
+      try { played = preview.play(); } catch (e) { played = null; }
+      return (played && played.catch) ? played.catch(function () {}) : null;
+    }).then(function () {
+      desk.on = true;
+      desk.lastCmd = null;
+      deskBtn.textContent = 'Stop desk camera';
+      if (desk.timer) { clearInterval(desk.timer); }
+      desk.timer = setInterval(function () { pollRoom(code); }, 1000);
+      pollRoom(code);
+      if (navigator.wakeLock && navigator.wakeLock.request) {
+        dsay('Room ' + code + '. Watching for the glasses…');
+        navigator.wakeLock.request('screen').then(function (l) { desk.lock = l; }).catch(function () {});
+      } else {
+        dsay('Room ' + code + '. Watching for the glasses… Keep the screen on.');
+      }
+    }).catch(function () {
+      stopDesk(true);
+      dsay('Could not open the camera. Allow camera access and try again.', true);
+    });
+  }
+
+  deskBtn.addEventListener('click', function () {
+    if (desk.on) { stopDesk(); return; }
+    startDesk();
+  });
+
+  function pollRoom(code) {
+    if (!desk.on || desk.working) { return; }
+    fetch('/api/room?code=' + encodeURIComponent(code), { cache: 'no-store' }).then(function (res) {
+      return res.ok ? res.json() : null;
+    }).then(function (room) {
+      if (!desk.on || !room || !room.command || room.command.id === desk.lastCmd) { return; }
+      desk.lastCmd = room.command.id;
+      handleCommand(code, room.command);
+    }).catch(function () { /* the next tick retries */ });
+  }
+
+  function postResult(code, id, verdict, tips, ms) {
+    return fetch('/api/room', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: code, action: 'result', id: id, verdict: verdict, tips: tips, ms: ms })
+    }).catch(function () { /* the glasses time out with their own message */ });
+  }
+
+  function handleCommand(code, cmd) {
+    desk.working = true;
+    dsay('Checking "' + cmd.target + '"…');
+    if (!pack || !preview.videoWidth || !oneToken(cmd.target)) {
+      desk.working = false;
+      dsay('Could not check that one. The glasses will ask again.', true);
+      return;
+    }
+    var t0 = Date.now();
+    var cleaned = null;
+    try { cleaned = SulatPhoto.clean(preview); } catch (e) { cleaned = null; }
+    var noshow = { verdict: 'retry', tips: ['I couldn’t see your writing. Write darker and keep the paper in view.'], ms: Date.now() - t0 };
+    if (!cleaned) {
+      showResult(noshow);
+      postResult(code, cmd.id, noshow.verdict, noshow.tips, noshow.ms);
+      desk.working = false;
+      return;
+    }
+    renderReference(cmd.target).then(function (refURL) {
+      return fetch('/api/paper', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target: cmd.target, photo: cleaned.dataURL, reference: refURL })
+      }).then(function (res) {
+        if (!res.ok) { return readError(res, 'Paper check failed').then(function (e) { throw e; }); }
+        return res.json();
+      });
+    }).then(function (found) {
+      showResult(found);
+      return postResult(code, cmd.id, found.verdict, found.tips || [], found.ms == null ? 0 : found.ms);
+    }).catch(function (err) {
+      dsay('Something went wrong: ' + err.message, true);
+    }).then(function () {
+      desk.working = false;
+    });
+  }
 
   CHIPS.forEach(function (text) {
     var b = document.createElement('button');
