@@ -2,8 +2,10 @@
   Sulat stroke scorer
   Compares a learner's strokes with the reference strokes for one syllable and
   returns a pass/fail plus ONE specific, kind correction. Deterministic: no AI.
-  Checks, in priority order: stroke count, vowel-mark side, stroke order,
-  stroke direction, then shape. Exposes window.SulatScore.score(ref, user, opts).
+  Default (legible-1): judges the picture. The ink must cover this letter and look more like it than any
+  other, with the vowel mark on the correct side. Stroke order, direction and count are only tips.
+  opts.strict = true runs the older strict-6 rules (stroke count, mark side, order, direction, shape),
+  which is what the Nov 1 family study used. Exposes window.SulatScore.score(ref, user, opts).
 
   ref:  [{ pts: [{x, y}, ...] }, ...]   reference strokes, in drawing order
   user: [{ pts: [{x, y}, ...] }, ...]   learner strokes, same coordinate units
@@ -120,8 +122,267 @@
     });
   }
 
+  // ---------------------------------------------------------------------------------------------
+  // Legibility scoring (default). Written after a Baybayin calligrapher advised that a strict stroke
+  // pattern or order is not important, as long as the characters are similar enough to the historically
+  // recorded forms and distinguishable from each other. So this judges the PICTURE: the ink has to land
+  // on the letter, cover the letter, and look more like this letter than any other, with the marks
+  // (which change the sound) on the right side. Stroke order, direction and count become gentle tips.
+  // The strict scorer is still here (opts.strict = true) and is what the Nov 1 family study used.
+  // ---------------------------------------------------------------------------------------------
+  function scoreLegible(ref, user, opts) {
+    var memory = opts.mode === 'memory';
+    var LG = memory
+      ? { m1: 0.075, p1: 0.17, m2: 0.075, p2: 0.17, cover: 0.12, minInk: 0.55 }
+      : { m1: 0.06, p1: 0.12, m2: 0.08, p2: 0.16, cover: 0.14, minInk: 0 };
+    var MARK_TRACE = 0.22;
+    var n = ref.length;
+    var k = opts.markStrokes && opts.markSide && n > opts.markStrokes ? opts.markStrokes : 0;
+    var refBase = ref.slice(0, n - k), refMark = ref.slice(n - k);
+    var R = bbox(ref), RB = bbox(refBase);
+
+    user = user.map(function (st) { return { pts: clean(st.pts) }; });
+
+    // Which of the learner's strokes are the mark (small ones), and which are the letter.
+    var userMark = [], userBase = user.slice();
+    if (k) {
+      var markRel = bbox(refMark).size / RB.size;
+      var smallestBase = Math.min.apply(null, refBase.map(function (st) { return bbox([st]).size / RB.size; }));
+      var thr = markRel * 2.5 + 0.05;
+      if (smallestBase * 0.8 > markRel * 1.3) { thr = Math.min(thr, smallestBase * 0.8); }
+      // The mark is the learner's smallest stroke(s): as many as the mark has, and only if small.
+      var bySize = user.map(function (st) { return { st: st, rel: bbox([st]).size / RB.size }; })
+        .sort(function (a, b) { return a.rel - b.rel; });
+      userBase = []; userMark = [];
+      bySize.forEach(function (o, idx) { (idx < k && o.rel <= thr ? userMark : userBase).push(o.st); });
+      if (!userBase.length) { userBase = user.slice(); userMark = []; }
+    }
+    var markName = opts.markKind === 'cross' ? 'cross' : 'dot';
+
+    // Line the letter up with the reference (same centre and size) from memory; trace is judged where it sits.
+    var U = bbox(userBase);
+    var s = memory ? RB.size / U.size : 1;
+    var ucx = memory ? U.cx : RB.cx, ucy = memory ? U.cy : RB.cy;
+    function T(p) { return { x: (p.x - ucx) * s + RB.cx, y: (p.y - ucy) * s + RB.cy }; }
+    var ubN = userBase.map(function (st) { return { pts: st.pts.map(T) }; });
+    var umN = userMark.map(function (st) { return { pts: st.pts.map(T) }; });
+    var transform = { s: s, ux: ucx, uy: ucy, rx: RB.cx, ry: RB.cy };
+
+    // Marks first: they change the sound, so a missing or misplaced one is a real mistake.
+    if (k) {
+      var why = opts.markKind === 'cross' ? 'That’s what silences its a.'
+        : (opts.markSide === 'above' ? 'That’s what turns its a into i.' : 'That’s what turns its a into u.');
+      if (!umN.length) {
+        return { pass: false, issue: 'mark', transform: transform,
+          message: 'Add the ' + markName + ' ' + opts.markSide + ' the letter. ' + why };
+      }
+      if (opts.markKind === 'cross') {
+        var oneLine = umN.length < 2 && pathLen(umN[0].pts) < 2.0 * Math.max(bbox(umN).size, 1);
+        if (oneLine) {
+          return { pass: false, issue: 'mark', transform: transform,
+            message: 'The cross needs two lines, one across the other. ' + why };
+        }
+      }
+      var c = centroid(umN), base = bbox(ubN);
+      var side = c.y < base.y0 + 0.2 * base.h ? 'above' : (c.y > base.y1 - 0.2 * base.h ? 'below' : 'middle');
+      if (side !== opts.markSide) {
+        return { pass: false, issue: 'mark', transform: transform,
+          message: (opts.markKind === 'cross' ? 'The cross' : 'The dot') + ' belongs ' + opts.markSide + ' the letter. ' + why };
+      }
+      if (!memory) {
+        var off = dist(c, centroid(refMark)) / R.size;
+        if (off > MARK_TRACE) {
+          return { pass: false, issue: 'mark', transform: transform,
+            message: 'The ' + markName + ' should sit on its guide. Trace it right there.' };
+        }
+      }
+    }
+
+    // Sample the ink: evenly spaced points along every stroke, however many strokes the learner used.
+    function cloud(strokes, stepSize) {
+      var out = [], step = stepSize || RB.size / 40;
+      strokes.forEach(function (st) {
+        var len = pathLen(st.pts);
+        var m = Math.max(3, Math.round(len / step));
+        resample(st.pts, m).forEach(function (p) { out.push(p); });
+      });
+      return out;
+    }
+    var rr = refBase.map(function (st) { return resample(st.pts, 40); });
+    var uc = ubN.map(function (st) { return resample(st.pts, 40); });
+    var ucl = cloud(ubN);
+    if (!ucl.length) { return { pass: false, issue: 'shape', transform: transform, message: 'Draw the letter, then check.' }; }
+
+    // Distance from a point to the nearest part of any stroke in a set; also whether that nearest spot
+    // is just the very end of a stroke (an overshoot).
+    function toSet(p, set) {
+      var best = 1e9, end = false;
+      for (var a = 0; a < set.length; a++) {
+        var path = set[a];
+        for (var i = 0; i < path.length - 1; i++) {
+          var r = segDist(p, path[i], path[i + 1]);
+          if (r.d < best) { best = r.d; end = (i === 0 && r.t === 0) || (i === path.length - 2 && r.t === 1); }
+        }
+      }
+      return { d: best, end: end };
+    }
+    function avg(d) { var t = 0; for (var q = 0; q < d.length; q++) { t += d[q]; } return t / d.length; }
+    function p90(d) { var c2 = d.slice().sort(function (x, y) { return x - y; }); return c2[Math.floor(0.9 * (c2.length - 1))]; }
+
+    var refSet = rr, userSet = uc;
+    var near1 = ucl.map(function (p) { return toSet(p, refSet); });           // learner ink -> letter
+    var onLetter = near1.filter(function (o) { return !o.end; });
+    var overshoot = 1 - onLetter.length / near1.length;
+    var d1 = (onLetter.length ? onLetter : near1).map(function (o) { return o.d / RB.size; });
+    var refCloud = cloud(refBase);
+    var d2 = refCloud.map(function (p) { return toSet(p, userSet).d / RB.size; }); // letter -> learner ink
+
+    // How well each reference stroke is covered by the ink (finds a missing stroke).
+    var covered = rr.map(function (path) {
+      return avg(resample(path, 24).map(function (p) { return toSet(p, userSet).d / RB.size; }));
+    });
+    var worstCover = 0, worstCoverI = 0;
+    covered.forEach(function (v, i) { if (v > worstCover) { worstCover = v; worstCoverI = i; } });
+    // A stroke is missing when most of it has no ink anywhere near it.
+    var FAR = 0.09, missingI = -1, missingFrac = 0;
+    rr.forEach(function (path, i) {
+      var pts = resample(path, 24), far = 0;
+      pts.forEach(function (p) { if (toSet(p, userSet).d / RB.size > FAR) { far++; } });
+      if (far / pts.length > missingFrac) { missingFrac = far / pts.length; missingI = i; }
+    });
+
+    var load = Math.max(avg(d1) / LG.m1, p90(d1) / LG.p1, avg(d2) / LG.m2, p90(d2) / LG.p2, worstCover / LG.cover);
+    if (!memory) { load = Math.max(load, overshoot / 0.35); }
+
+    // Pair each reference stroke with the learner stroke that covers it best (any order, any direction).
+    function pairCost(a, b) {
+      var A = resample(a, 24), B = resample(b, 24), x = 0, y = 0, i;
+      for (i = 0; i < A.length; i++) { x += toSet(A[i], [B]).d; }
+      for (i = 0; i < B.length; i++) { y += toSet(B[i], [A]).d; }
+      return (x + y) / (A.length + B.length) / RB.size;
+    }
+    var match = rr.map(function (path, i) {
+      var best = -1, bc = 1e9;
+      uc.forEach(function (u, j) { var cst = pairCost(path, u); if (cst < bc) { bc = cst; best = j; } });
+      return { i: i, j: best, cost: bc };
+    });
+
+    // A curve drawn as a straight line is a different shape, even if the ink stays close to it.
+    function bend(p) {
+      var a = p[0], c2 = p[p.length - 1], chord = dist(a, c2), mx = 0;
+      for (var q = 0; q < p.length; q++) {
+        var d = chord < 0.15 * RB.size ? dist(a, p[q])
+          : Math.abs((c2.y - a.y) * p[q].x - (c2.x - a.x) * p[q].y + c2.x * a.y - c2.y * a.x) / chord;
+        if (d > mx) { mx = d; }
+      }
+      return mx / RB.size;
+    }
+    var flatI = -1, claimed = {};
+    match.forEach(function (m) { claimed[m.j] = (claimed[m.j] || 0) + 1; });
+    match.forEach(function (m) {
+      if (claimed[m.j] > 1 || m.cost > 0.12) { return; }
+      if (userBase.length !== refBase.length) { return; }   // a stroke lifted into pieces is still the same curve
+      if (m.j < 0) { return; }
+      var rb = bend(rr[m.i]), ub = bend(uc[m.j]);
+      if (rb > 0.06 && ub < 0.45 * rb && flatI < 0) { flatI = m.i; }
+    });
+
+    // Closer to a different letter? (From memory only; the page passes the other letters.)
+    if (memory && load <= 1 && flatI < 0 && opts.alternatives && opts.alternatives.length) {
+      var fit = function (target) {
+        var tb = target.slice(0, target.length - k), TB = bbox(tb), sc = TB.size / U.size;
+        var tset = tb.map(function (st) { return resample(st.pts, 24); });
+        var uset = ubN.map(function (st) {
+          return resample(st.pts.map(function (p) { return { x: (p.x - RB.cx) / s * 1, y: (p.y - RB.cy) / s * 1 }; })
+            .map(function (p) { return { x: (p.x) * sc + TB.cx, y: (p.y) * sc + TB.cy }; }), 24);
+        });
+        var cs = TB.size / 22;
+        var a1 = cloud(uset.map(function (pp) { return { pts: pp }; }), cs), a2 = cloud(tb, cs);
+        var x = avg(a1.map(function (p) { return toSet(p, tset).d; })), y = avg(a2.map(function (p) { return toSet(p, uset).d; }));
+        return (x + y) / 2 / TB.size;
+      };
+      var own = fit(ref), bestAlt = 1e9;
+      opts.alternatives.forEach(function (alt) { if (alt.strokes.length === n) { bestAlt = Math.min(bestAlt, fit(alt.strokes)); } });
+      if (own > 0.03 && bestAlt < own * 0.8) {
+        return { pass: false, issue: 'lookalike', error: own, transform: transform,
+          message: 'That reads more like a different letter. Compare it with the guide, then try again.' };
+      }
+    }
+
+    var mean = (avg(d1) + avg(d2)) / 2;
+    var refInk = 0, userInk = 0;
+    refBase.forEach(function (st) { refInk += pathLen(st.pts); });
+    ubN.forEach(function (st) { userInk += pathLen(st.pts); });
+    var inkRatio = userInk / refInk;
+    if (missingFrac > 0.5 || inkRatio < 0.8) {
+      return { pass: false, issue: 'missing', stroke: missingI, error: mean, transform: transform,
+        message: 'Stroke ' + (missingI + 1) + ' looks missing or too far from the shape. ' +
+          (memory ? 'Picture Show me and try again.' : 'Follow the numbers on the guide.') };
+    }
+    if (flatI >= 0) {
+      return { pass: false, issue: 'straight', stroke: flatI, error: mean, transform: transform,
+        message: 'Stroke ' + (flatI + 1) + ' should curve more, like the guide. Compare it, then try again.' };
+    }
+    if (load > 1) {
+      var what;
+      if (worstCover / LG.cover >= 1 && worstCover / LG.cover >= load * 0.99) {
+        what = 'Stroke ' + (worstCoverI + 1) + ' looks missing or too far from the shape. ' +
+          (memory ? 'Picture Show me and try again.' : 'Follow the numbers on the guide.');
+        return { pass: false, issue: 'missing', stroke: worstCoverI, error: mean, transform: transform, message: what };
+      }
+      if (!memory && overshoot / 0.35 >= load * 0.99) {
+        return { pass: false, issue: 'shape', error: mean, transform: transform,
+          message: 'Part of your line runs past the guide. Stay on the guide and try again.' };
+      }
+      var offG = false;
+      if (!memory) {
+        // Right shape but away from the guide? Line the ink up and look again.
+        var UB = bbox(ubN), sh2 = ubN.map(function (st) { return { pts: st.pts.map(function (p) { return { x: p.x - UB.cx + RB.cx, y: p.y - UB.cy + RB.cy }; }) }; });
+        var cl2 = cloud(sh2), e1 = cl2.map(function (p) { return toSet(p, refSet).d / RB.size; });
+        var e2 = refCloud.map(function (p) { return toSet(p, sh2.map(function (st) { return resample(st.pts, 40); })).d / RB.size; });
+        if (avg(e1) < LG.m1 * 0.7 && avg(e2) < LG.m2 * 0.7) { offG = true; }
+      }
+      if (offG) {
+        return { pass: false, issue: 'offguide', error: mean, transform: transform,
+          message: 'That has the right shape but sits off the guide. Trace right on top of it.' };
+      }
+      return { pass: false, issue: 'shape', error: mean, transform: transform,
+        message: 'That drifts from the shape. ' + (memory ? 'Compare it with the guide, then try again.' : 'Trace closer to the guide and try again.') };
+    }
+
+    // It reads fine. Offer ONE gentle tip about the usual way, never a failure.
+    var tip = '';
+    var strokeRel = function (st) { return pathLen(st.pts) / RB.size; };
+    var used = {};
+    var big = match.filter(function (m) { return m.j >= 0 && m.cost < 0.2 && strokeRel(refBase[m.i]) >= 0.12; });
+    var reversedAt = -1;
+    big.forEach(function (m) {
+      var a = resample(refBase[m.i].pts, 32), b = resample(ubN[m.j].pts, 32), f = 0, rv = 0;
+      for (var q = 0; q < 32; q++) { f += dist(a[q], b[q]); rv += dist(a[q], b[31 - q]); }
+      f /= 32 * RB.size; rv /= 32 * RB.size;
+      if (reversedAt < 0 && f > 0.12 && rv < f * 0.6) { reversedAt = m.i; }
+    });
+    if (reversedAt >= 0) {
+      tip = 'Tip: stroke ' + (reversedAt + 1) + ' is usually written from ' + startWord(refBase[reversedAt].pts) + '. Yours reads fine either way.';
+    } else if (userBase.length !== refBase.length) {
+      tip = 'Tip: Show me writes the letter in ' + refBase.length + (refBase.length === 1 ? ' stroke' : ' strokes') + '. Yours reads fine.';
+    } else {
+      var seq = big.map(function (m) { return m.j; });
+      var inOrder = seq.every(function (v, i2) { return i2 === 0 || v > seq[i2 - 1]; });
+      if (!inOrder) { tip = 'Tip: Show me writes the strokes in a different order. Yours reads fine.'; }
+    }
+    if (!tip && load > 0.8) { tip = 'Tip: you could follow the curves a little more closely.'; }
+    var out = { pass: true, issue: tip ? 'tip' : null, error: mean, transform: transform, message: 'Looks right!' };
+    if (tip) { out.tip = tip; }
+    return out;
+  }
+
   function score(ref, user, opts) {
     opts = opts || {};
+    if (!opts.strict) {
+      if (!user.length) { return { pass: false, issue: 'empty', message: 'Draw it first, then check.' }; }
+      return scoreLegible(ref, user, opts);
+    }
     var memory = opts.mode === 'memory';
     // How far a stroke may stray, as a fraction of the glyph's size. Tracing is measured against the
     // guide itself; from memory, size and position are forgiven but the shape must hold.
@@ -357,5 +618,5 @@
     return { pass: true, issue: null, error: mean, strokes: strokes, transform: transform, message: 'Looks right!' };
   }
 
-  global.SulatScore = { score: score, resample: resample, bbox: bbox, version: 'strict-6' };
+  global.SulatScore = { score: score, resample: resample, bbox: bbox, version: 'legible-1' };
 })(typeof window !== 'undefined' ? window : this);
