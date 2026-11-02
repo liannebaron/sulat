@@ -7,6 +7,10 @@ function bad(msg, status) {
   return Response.json({ error: msg }, { status: status || 400 });
 }
 
+function fail(op, e) {
+  return Response.json({ error: op + ' failed.', detail: String((e && e.message) || e) }, { status: 500 });
+}
+
 function normCode(code) {
   var c = String(code || '').trim().toUpperCase();
   return /^[A-Z0-9]{4,8}$/.test(c) ? c : null;
@@ -35,17 +39,23 @@ function toRoom(code, row) {
 }
 
 export async function onRequestGet(context) {
+  try {
   var db = context.env && context.env.DB;
   if (!db) { return Response.json({ error: 'Room storage is not configured.' }, { status: 500 }); }
+  await ensureSchema(db);
   var code = null;
   try { code = new URL(context.request.url).searchParams.get('code'); } catch (e) { /* handled below */ }
   code = normCode(code);
   if (!code) { return bad('Send a room code of 4 to 8 letters or digits, e.g. ?code=4821.'); }
   var row = await db.prepare('SELECT * FROM rooms WHERE code = ?').bind(code).first();
   return Response.json(toRoom(code, row));
+  } catch (e) {
+    return fail('Room lookup', e);
+  }
 }
 
 export async function onRequestPost(context) {
+  try {
   var db = context.env && context.env.DB;
   if (!db) { return Response.json({ error: 'Room storage is not configured.' }, { status: 500 }); }
   var body = null;
@@ -94,4 +104,7 @@ export async function onRequestPost(context) {
     'UPDATE rooms SET verdict = ?, tips = ?, ms = ?, updated_at = ? WHERE code = ?'
   ).bind(verdict, JSON.stringify(tips.slice(0, 2)), Math.round(ms), now, code).run();
   return Response.json({ code: code, result: { id: rid, verdict: verdict, tips: tips.slice(0, 2), ms: Math.round(ms) } });
+  } catch (e) {
+    return fail('Room save', e);
+  }
 }

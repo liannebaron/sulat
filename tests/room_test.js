@@ -6,17 +6,21 @@ const dir = (process.env.SULAT_DIR || require('path').join(__dirname, '..') + '/
 // Minimal in-memory D1 stand-in: only the statements room.js uses.
 function fakeDB() {
   const rows = new Map();
-  return {
+  let created = false;
+  const api = {
     rows,
     prepare(sql) {
       const q = sql.replace(/\s+/g, ' ').trim();
       const runner = (args) => ({
         first: async () => {
-          if (q.startsWith('SELECT')) { const r = rows.get(args[0]); return r ? { ...r } : null; }
+          if (q.startsWith('SELECT')) {
+            if (!created) { throw new Error('no such table: rooms'); }
+            const r = rows.get(args[0]); return r ? { ...r } : null;
+          }
           return null;
         },
         run: async () => {
-          if (q.startsWith('CREATE TABLE')) { return { success: true }; }
+          if (q.startsWith('CREATE TABLE')) { created = true; return { success: true }; }
           if (q.startsWith('DELETE')) {
             for (const [k, r] of rows) { if (r.updated_at < args[0]) { rows.delete(k); } }
             return { success: true };
@@ -37,6 +41,7 @@ function fakeDB() {
       return { bind: (...args) => runner(args), run: () => runner([]).run(), first: () => runner([]).first() };
     },
   };
+  return api;
 }
 
 const ctx = { Response: Response, console: console, crypto: require('crypto'), URL: URL };
