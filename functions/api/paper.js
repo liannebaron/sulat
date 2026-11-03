@@ -156,7 +156,7 @@ export async function onRequestPost(context) {
             ]
           }
         ]
-      });
+      };
     if (effortValue) { b.reasoning_effort = effortValue; }
     return JSON.stringify(b);
   }
