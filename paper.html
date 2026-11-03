@@ -452,6 +452,10 @@
   function handleCommand(code, cmd) {
     desk.working = true;
     dsay('Checking "' + cmd.target + '"…');
+    result.hidden = false;
+    verdictEl.textContent = 'Checking your writing…';
+    tipsEl.innerHTML = '';
+    timingsEl.textContent = '';
     var t0 = Date.now();
     var RETRY_TIP = 'I couldn’t check that one. Press Check again.';
     if (!pack || !oneToken(cmd.target)) {

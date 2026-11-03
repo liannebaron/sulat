@@ -331,7 +331,8 @@
   function postCapture(text) {
     lensMode = 'checking';
     clearTimeout(lensTimer);
-    $('lensNote').textContent = 'Checking…';
+    $('lensWord').textContent = 'Checking…';
+    $('lensNote').textContent = '';
     setLensUI();
     fetch('/api/room', {
       method: 'POST',
@@ -346,6 +347,7 @@
       pollLens(90);
     }).catch(function () {
       lensMode = 'try';
+      $('lensWord').textContent = 'Write ' + tryTok + ' on paper';
       $('lensNote').textContent = 'Room unreachable. Enter to try again.';
       setLensUI();
     });
