@@ -403,6 +403,11 @@
     try { seen.removeAttribute('src'); } catch (e) { /* older browser */ }
     seenCap.textContent = 'Your photo';
     cleaned = null;
+    result.hidden = true;
+    verdictEl.textContent = '';
+    tipsEl.innerHTML = '';
+    timingsEl.textContent = '';
+    refWrap.hidden = true;
     refreshReference();
     if (!silent) { dsay('Desk camera off.'); }
   }
@@ -429,6 +434,10 @@
       desk.skipFirst = true;
       deskBtn.textContent = 'Stop desk camera';
       photoCard.hidden = true;
+      result.hidden = true;
+      verdictEl.textContent = '';
+      tipsEl.innerHTML = '';
+      timingsEl.textContent = '';
       deskTarget.hidden = true;
       refWrap.hidden = false;
       refImg.hidden = true;
