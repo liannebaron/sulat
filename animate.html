@@ -287,6 +287,10 @@
     b.focus();
   }
 
+  function escLensTip(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
   // Verdicts may pair praise with a fix ("Lovely ki!", "Dot sits left.").
   // Show the fix first so the learner sees what to change.
   var LENS_PRAISE = /\b(lovely|great|nice|perfect|beautiful|wonderful|excellent|good job|well done)\b|!\s*$/i;
@@ -374,9 +378,10 @@
     lensMode = 'verdict';
     $('lensWord').textContent = found.verdict === 'good' ? 'Magaling!'
       : (found.verdict === 'almost' ? 'Almost' : 'Try again');
-    $('lensNote').textContent = found.verdict === 'good'
-      ? ((found.tips && found.tips[0]) || '')
-      : orderTips(found.tips).join(' ');
+    var shown = found.verdict === 'good'
+      ? orderTips(found.tips).slice(0, 1)
+      : orderTips(found.tips);
+    $('lensNote').innerHTML = shown.map(escLensTip).join('<br>');
     setLensUI();
   }
 

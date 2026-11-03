@@ -125,25 +125,25 @@ export async function onRequestPost(context) {
     'or the vowel mark is missing or on the wrong side. ' +
     'Only say it looks like a different letter if it would actually be read as another Baybayin character. ' +
     'Style differences, such as a hook instead of a corner, a slightly different angle, ' +
-    'or a bar that is a little short, are "almost" with a tip, not "retry".';
+    'or a bar that is a little short, are "almost" with a tip, not "retry". ' +
+    '"good" means it clearly reads as the target with the right mark, even if it could be neater; ' +
+    'put polish suggestions in a tip alongside "good". ' +
+    'Use "almost" only when a part is genuinely unclear or the mark is borderline.';
   var photoUrl = 'data:' + (photo.indexOf('iVBO') === 0 ? 'image/png' : 'image/jpeg') + ';base64,' + photo;
   var userText = 'The target syllable is "' + target.toLowerCase() + '". ' +
     'The expected vowel mark is ' + markText(tok) + '. ' +
     'Is the handwritten character clear, with the expected mark? Reply with JSON only.';
 
-  var started = Date.now();
-  var metaRes;
-  try {
-    metaRes = await fetch(META_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: 'Bearer ' + apiKey,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'muse-spark-1.3',
-        max_completion_tokens: 6000,
-        messages: [
+  // TODO: remove the effort override before going public.
+  var effort = null;
+  try { effort = new URL(context.request.url).searchParams.get('effort'); } catch (e) { /* ignore */ }
+  if (effort !== 'low' && effort !== 'medium' && effort !== 'high') { effort = null; }
+
+  function chatBody(effortValue, maxTokens) {
+    var b = {
+      model: 'muse-spark-1.3',
+      max_completion_tokens: maxTokens,
+      messages: [
           { role: 'system', content: system },
           {
             role: 'user',
@@ -156,55 +156,95 @@ export async function onRequestPost(context) {
             ]
           }
         ]
-      })
+      });
+    if (effortValue) { b.reasoning_effort = effortValue; }
+    return JSON.stringify(b);
+  }
+
+  async function metaCall(effortValue, maxTokens) {
+    var res = await fetch(META_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + apiKey,
+        'Content-Type': 'application/json'
+      },
+      body: chatBody(effortValue, maxTokens)
     });
+    var d = null;
+    try { d = await res.json(); } catch (e) { /* handled by caller */ }
+    return { res: res, data: d };
+  }
+
+  function replyOf(data) {
+    var m = data && data.choices && data.choices[0] && data.choices[0].message;
+    var c = '';
+    if (m) {
+      if (typeof m.content === 'string') { c = m.content; }
+      else if (Array.isArray(m.content)) {
+        c = m.content.map(function (p) {
+          if (typeof p === 'string') { return p; }
+          return p && typeof p.text === 'string' ? p.text : '';
+        }).join('\n');
+      }
+    }
+    return {
+      finish: data && data.choices && data.choices[0] && data.choices[0].finish_reason,
+      usage: data && data.usage,
+      content: c,
+      parsed: parseVerdict(c, target.toLowerCase())
+    };
+  }
+
+  // TODO: remove the debug usage before going public.
+  function usageOf(usage) {
+    if (!usage) { return null; }
+    var out = { completion_tokens: usage.completion_tokens != null ? usage.completion_tokens : null };
+    var det = usage.completion_tokens_details || usage.completion_details;
+    if (det && det.reasoning_tokens != null) { out.reasoning_tokens = det.reasoning_tokens; }
+    return out;
+  }
+
+  var started = Date.now();
+  var first;
+  try {
+    first = await metaCall(effort, 6000);
   } catch (e) {
     return Response.json({ error: 'Could not reach the paper service. Try again.' }, { status: 502 });
   }
   var ms = Date.now() - started;
 
-  if (!metaRes.ok) {
+  if (!first.res.ok) {
     var detail = '';
-    try { detail = await metaRes.text(); } catch (e) { /* ignore */ }
+    try { detail = await first.res.text(); } catch (e) { /* ignore */ }
     return Response.json(
-      { error: 'The paper service returned an error (' + metaRes.status + ').', detail: detail.slice(0, 500), ms: ms },
+      { error: 'The paper service returned an error (' + first.res.status + ').', detail: detail.slice(0, 500), ms: ms },
       { status: 502 }
     );
   }
-  var data = null;
-  try { data = await metaRes.json(); } catch (e) { /* handled below */ }
-  var msg = data && data.choices && data.choices[0] && data.choices[0].message;
-  var finishReason = data && data.choices && data.choices[0] && data.choices[0].finish_reason;
-  var usage = data && data.usage;
-  var content = '';
-  if (msg) {
-    if (typeof msg.content === 'string') { content = msg.content; }
-    else if (Array.isArray(msg.content)) {
-      content = msg.content.map(function (p) {
-        if (typeof p === 'string') { return p; }
-        return p && typeof p.text === 'string' ? p.text : '';
-      }).join('\n');
+  var once = replyOf(first.data);
+  if (!once.parsed) {
+    var second = null;
+    try {
+      second = await metaCall('low', 3000);
+    } catch (e) {
+      second = null;
     }
-  }
-  var parsed = parseVerdict(content, target.toLowerCase());
-  if (!parsed) {
+    var msTotal = Date.now() - started;
+    var twice = (second && second.res.ok) ? replyOf(second.data) : null;
+    if (twice && twice.parsed) {
+      return Response.json({ verdict: twice.parsed.verdict, tips: twice.parsed.tips, ms: msTotal, usage: usageOf(twice.usage) });
+    }
+    twice = twice || once;
     // TODO: remove the debug text before going public.
     return Response.json({
       error: 'The feedback came back unclear. Try again with a sharper photo.',
       debug: {
-        finish_reason: finishReason || null,
-        content_length: content.length,
-        content_head: content.slice(0, 300)
+        finish_reason: (twice.finish) || null,
+        content_length: twice.content.length,
+        content_head: twice.content.slice(0, 300)
       },
-      ms: ms
+      ms: msTotal
     }, { status: 502 });
   }
-  // TODO: remove the debug usage before going public.
-  var usageOut = null;
-  if (usage) {
-    usageOut = { completion_tokens: usage.completion_tokens != null ? usage.completion_tokens : null };
-    var det = usage.completion_tokens_details || usage.completion_details;
-    if (det && det.reasoning_tokens != null) { usageOut.reasoning_tokens = det.reasoning_tokens; }
-  }
-  return Response.json({ verdict: parsed.verdict, tips: parsed.tips, ms: ms, usage: usageOut });
+  return Response.json({ verdict: once.parsed.verdict, tips: once.parsed.tips, ms: ms, usage: usageOf(once.usage) });
 }
