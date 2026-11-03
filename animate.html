@@ -88,7 +88,7 @@
   #lensWord { font-size: 44px; color: #fff; }
   #lensCount { font-size: 26px; color: #fff; }
   #lensStage svg { display: block; width: 100%; height: auto; max-height: 270px; color: #fff; }
-  #lensNote { font-size: 26px; line-height: 1.25; color: #fff; min-height: 66px; }
+  #lensNote { font-size: 26px; line-height: 1.25; color: #fff; min-height: 66px; text-wrap: balance; }
   #lensStage .label { fill: #fff; font-family: Georgia, serif; }
   #lensStage .label.active { opacity: 1; }
   #lensBottom { display: flex; align-items: center; gap: 24px; }
@@ -137,7 +137,7 @@
   <div id="lensNote"></div>
   <div id="lensBottom">
     <button id="lensReplay" type="button">Replay</button>
-    <div id="lensHint">← → next letter<br>↑ back to phrases</div>
+    <div id="lensHint">← → next letter · ↓ try on paper<br>↑ back to phrases</div>
   </div>
 </div>
 
@@ -170,6 +170,29 @@
   $('slow').setAttribute('aria-pressed', speed < 1 ? 'true' : 'false');
 
   function status(msg) { $('status').textContent = msg; }
+
+  // Built with Muse Code: glasses loop. The lenses never touch the network for
+  // anything but this room: they post a capture command, the desk phone answers.
+  var lensMode = 'show'; // show | try | checking | verdict
+  var lensTimer = 0;
+  var pendingCmd = null;
+  var tryTok = '';
+  var roomCode = null;
+  if (glasses) {
+    var qroom = params.get('room');
+    if (qroom && /^[A-Za-z0-9]{4,8}$/.test(qroom)) {
+      roomCode = qroom.toUpperCase();
+      try { window.localStorage.setItem('sulat.room', roomCode); } catch (e) { /* private mode */ }
+    } else {
+      try { roomCode = window.localStorage.getItem('sulat.room'); } catch (e) { roomCode = null; }
+      if (roomCode) { roomCode = String(roomCode).toUpperCase(); }
+      if (!roomCode || !/^[A-Z0-9]{4,8}$/.test(roomCode)) { roomCode = null; }
+    }
+    if (!roomCode) {
+      roomCode = String(Math.floor(1000 + Math.random() * 9000));
+      try { window.localStorage.setItem('sulat.room', roomCode); } catch (e) { /* private mode */ }
+    }
+  }
 
   function highlighter(labels) {
     return function (i) {
@@ -228,6 +251,8 @@
     var units = lensUnits();
     if (!units.length) { return; }
     unitIndex = (unitIndex + units.length) % units.length;
+    lensMode = 'show';
+    clearTimeout(lensTimer);
     var u = units[unitIndex];
     $('lensWord').textContent = u.word;
     $('lensCount').textContent = (unitIndex + 1) + ' / ' + units.length;
@@ -242,10 +267,125 @@
       ariaLabel: u.tok.text + ' in Baybayin'
     });
     ctrl.play({ speed: speed });
-    $('lensReplay').focus();
+    setLensUI();
   }
 
   function replay() { if (ctrl) { ctrl.play({ speed: speed }); } }
+
+  // Built with Muse Code: the Replay button follows the lens mode, so Enter
+  // (or Neural Band Select) always presses the focused button for this screen.
+  function setLensUI() {
+    var b = $('lensReplay');
+    if (lensMode === 'checking') { b.textContent = 'Checking…'; b.disabled = true; }
+    else {
+      b.disabled = false;
+      b.textContent = lensMode === 'try' ? 'Check' : (lensMode === 'verdict' ? 'Check again' : 'Replay');
+    }
+    $('lensHint').innerHTML = lensMode === 'show'
+      ? '← → next letter · ↓ try on paper<br>↑ back to phrases'
+      : (lensMode === 'verdict' ? '→ next letter · ← Show me again' : '← back to Show me');
+    b.focus();
+  }
+
+  function escLensTip(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // Verdicts may pair praise with a fix ("Lovely ki!", "Dot sits left.").
+  // Show the fix first so the learner sees what to change.
+  var LENS_PRAISE = /\b(lovely|great|nice|perfect|beautiful|wonderful|excellent|good job|well done)\b|!\s*$/i;
+  function orderTips(tips) {
+    var fix = [], kind = [];
+    (tips || []).filter(function (t) { return typeof t === 'string' && t.trim(); }).slice(0, 2).forEach(function (t) {
+      ((LENS_PRAISE.test(t)) ? kind : fix).push(t);
+    });
+    return fix.concat(kind);
+  }
+
+  // "Now you try" for the current syllable: the learner writes on paper under
+  // the desk camera and presses to check. Enter posts a capture command; the
+  // phone answers in the room and the lenses poll for it.
+  function currentTok() {
+    words = Sulat.syllabify(input.value);
+    var units = lensUnits();
+    if (!units.length) { return null; }
+    unitIndex = (unitIndex + units.length) % units.length;
+    return units[unitIndex].tok.text;
+  }
+
+  function openTry() {
+    if (!pack) { return; }
+    var text = currentTok();
+    if (!text) { return; }
+    clearTimeout(lensTimer);
+    if (ctrl) { try { ctrl.stop(); } catch (e) { /* already stopped */ } }
+    tryTok = text;
+    lensMode = 'try';
+    $('lensStage').innerHTML = '';
+    $('lensWord').textContent = 'Write ' + text + ' on paper';
+    $('lensCount').textContent = 'Phone code: ' + roomCode;
+    $('lensNote').textContent = 'Press to check';
+    setLensUI();
+  }
+
+  function postCapture(text) {
+    lensMode = 'checking';
+    clearTimeout(lensTimer);
+    $('lensWord').textContent = 'Checking…';
+    $('lensNote').textContent = '';
+    setLensUI();
+    fetch('/api/room', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: roomCode, action: 'capture', target: text })
+    }).then(function (res) {
+      return res.ok ? res.json() : Promise.reject(new Error('room ' + res.status));
+    }).then(function (data) {
+      if (!data || !data.command) { throw new Error('no command'); }
+      pendingCmd = data.command;
+      tryTok = data.command.target || text;
+      pollLens(90);
+    }).catch(function () {
+      lensMode = 'try';
+      $('lensWord').textContent = 'Write ' + tryTok + ' on paper';
+      $('lensNote').textContent = 'Room unreachable. Enter to try again.';
+      setLensUI();
+    });
+  }
+
+  function pollLens(left) {
+    clearTimeout(lensTimer);
+    if (!pendingCmd) { return; }
+    if (left <= 0) {
+      lensMode = 'try';
+      $('lensNote').textContent = 'No answer from the phone. Is desk camera on?';
+      setLensUI();
+      return;
+    }
+    var want = pendingCmd ? pendingCmd.id : null;
+    lensTimer = setTimeout(function () {
+      fetch('/api/room?code=' + encodeURIComponent(roomCode), { cache: 'no-store' }).then(function (res) {
+        return res.ok ? res.json() : null;
+      }).then(function (room) {
+        if (lensMode !== 'checking' || !pendingCmd || pendingCmd.id !== want) { return; }
+        if (room && room.result && room.result.id === want) { showVerdict(room.result); }
+        else { pollLens(left - 1); }
+      }).catch(function () { if (lensMode === 'checking') { pollLens(left - 1); } });
+    }, 1000);
+  }
+
+  function showVerdict(found) {
+    if (lensMode !== 'checking') { return; }
+    clearTimeout(lensTimer);
+    lensMode = 'verdict';
+    $('lensWord').textContent = found.verdict === 'good' ? 'Magaling!'
+      : (found.verdict === 'almost' ? 'Almost' : 'Try again');
+    var shown = found.verdict === 'good'
+      ? orderTips(found.tips).slice(0, 1)
+      : orderTips(found.tips);
+    $('lensNote').innerHTML = shown.map(escLensTip).join('<br>');
+    setLensUI();
+  }
 
   function go(url) {
     if (window.__sulatNav) { window.__sulatNav(url); } else { window.location.replace(url); }
@@ -265,7 +405,14 @@
 
   $('go').addEventListener('click', renderPhrase);
   $('replay').addEventListener('click', replay);
-  $('lensReplay').addEventListener('click', replay);
+  $('lensReplay').addEventListener('click', function () {
+    if (lensMode === 'show') { replay(); }
+    else if (lensMode === 'checking') { /* ignore while checking */ }
+    else {
+      var text = currentTok() || tryTok;
+      if (text) { postCapture(text); }
+    }
+  });
   $('slow').addEventListener('click', function () {
     speed = speed < 1 ? 1 : 0.55;
     $('slow').setAttribute('aria-pressed', speed < 1 ? 'true' : 'false');
@@ -281,10 +428,23 @@
   document.addEventListener('keydown', function (e) {
     if (e.target === input) { return; }
     if (glasses) {
-      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); unitIndex += 1; renderLensUnit(); }
-      else if (e.key === 'ArrowLeft') { e.preventDefault(); unitIndex -= 1; renderLensUnit(); }
-      else if (e.key === 'ArrowUp') { e.preventDefault(); go('index.html'); }
-      else if ((e.key === 'Enter' || e.key === ' ') && e.target !== $('lensReplay')) { e.preventDefault(); replay(); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); unitIndex += 1; renderLensUnit(); }
+      else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        if (lensMode === 'show') { unitIndex -= 1; }
+        renderLensUnit();
+      }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); openTry(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); if (lensMode === 'show') { go('index.html'); } else { renderLensUnit(); } }
+      else if ((e.key === 'Enter' || e.key === ' ') && e.target !== $('lensReplay')) {
+        e.preventDefault();
+        if (lensMode === 'show') { replay(); }
+        else if (lensMode === 'checking') { /* ignore while checking */ }
+        else {
+          var text = currentTok() || tryTok;
+          if (text) { postCapture(text); }
+        }
+      }
     } else if (e.key === 'Enter' && e.target === document.body) {
       e.preventDefault();
       replay();

@@ -59,6 +59,10 @@
   .tip { margin: 0 0 10px; color: var(--quiet); }
   #status { min-height: 1.4em; margin: 10px 0 0; color: var(--quiet); }
   #status.error { color: var(--warn); }
+  #deskStatus { min-height: 1.4em; margin: 10px 0 0; color: var(--quiet); }
+  #deskStatus.error { color: var(--warn); }
+  #preview { display: block; width: 100%; max-width: 320px; height: auto; margin-top: 12px; border: 1px solid var(--line); border-radius: 10px; background: #000; }
+  #deskTarget { font: 400 30px Georgia, "Times New Roman", serif; margin: 0 0 8px; }
   .compare { display: flex; gap: 12px; margin-top: 12px; }
   .compare figure { flex: 1 1 0; min-width: 0; max-width: 180px; margin: 0; }
   .compare figcaption { margin-top: 6px; color: var(--quiet); font-size: 14px; }
@@ -77,16 +81,30 @@
   <h1>Paper check</h1>
   <p class="lede">Write one Baybayin syllable on paper, photograph it, and Sulat tells you what to fix.</p>
 
-  <section class="card">
-    <label class="field" for="syl">Syllable</label>
+  <section class="card" id="photoCard">
+    <label class="field" for="syl">Or type any syllable</label>
     <input id="syl" type="text" value="ma" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="8">
     <div class="chips" id="chips"></div>
+    <button id="moreLetters" type="button">More letters</button>
     <p class="tip">Use a dark pen, write big, and fill the frame.</p>
     <div class="row">
       <label class="filebtn" id="photoLabel" for="photo">Take a photo</label>
       <input id="photo" type="file" accept="image/*" capture="environment" hidden>
       <button id="check" type="button" class="primary">Check my writing</button>
     </div>
+  </section>
+
+  <section class="card">
+    <h2>Desk camera</h2>
+    <div id="deskTarget" hidden></div>
+    <p class="tip">Put this phone on a stand above the paper, facing down at your writing. The glasses will ask it to check.</p>
+    <label class="field" for="room">Room code (shown in the glasses)</label>
+    <input id="room" type="text" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="8" placeholder="e.g. 4821">
+    <div class="row" style="margin-top:14px">
+      <button id="desk" type="button">Use as desk camera</button>
+    </div>
+    <video id="preview" playsinline muted hidden></video>
+    <p id="deskStatus" role="status" aria-live="polite"></p>
   </section>
 
   <section class="card" id="result" hidden>
@@ -103,7 +121,7 @@
       </figure>
       <figure id="refWrap" hidden>
         <div class="slot"><img id="ref" alt="Reference glyph"></div>
-        <figcaption>Reference</figcaption>
+        <figcaption id="refCap">Reference</figcaption>
       </figure>
     </div>
     <p id="status" role="status" aria-live="polite"></p>
@@ -123,7 +141,21 @@
   var photoLabel = $('photoLabel'), refWrap = $('refWrap'), refImg = $('ref');
   var refCache = null; // { target, url } — the reference also sent to the API
 
-  var CHIPS = ['ma', 'ka', 'ki', 'ta', 'sa', 'la'];
+  var moreMode = false;
+  function chipTargets() {
+    var q = null;
+    try { q = new URLSearchParams(window.location.search).get('text'); } catch (e) { q = null; }
+    var out = [];
+    Sulat.syllabify(q || 'mahal kita').forEach(function (w) {
+      w.tokens.forEach(function (t) {
+        if (out.indexOf(t.text) < 0) { out.push(t.text); }
+      });
+    });
+    return out.length ? out : ['ma'];
+  }
+  function baseLetters() {
+    return Object.keys(pack.glyphs).filter(function (g) { return g.indexOf('mark-') !== 0; });
+  }
   var pack = null;
   var cleaned = null; // { canvas, dataURL } from SulatPhoto.clean
   var busy = false;
@@ -197,7 +229,9 @@
       if ((sylInput.value || '').trim().toLowerCase() !== target) { return; }
       refCache = { target: target, url: url };
       refImg.src = url;
+      refImg.hidden = false;
       refWrap.hidden = false;
+      refCap.textContent = 'Reference';
     }).catch(function () {
       refWrap.hidden = true;
       refCache = null;
@@ -304,7 +338,9 @@
       : renderReference(target).then(function (refURL) {
         refCache = { target: target, url: refURL };
         refImg.src = refURL;
+        refImg.hidden = false;
         refWrap.hidden = false;
+        refCap.textContent = 'Reference';
         return refURL;
       });
     refP.then(function (refURL) {
@@ -326,20 +362,240 @@
     });
   });
 
-  CHIPS.forEach(function (text) {
-    var b = document.createElement('button');
-    b.type = 'button';
-    b.textContent = text;
-    b.setAttribute('aria-pressed', text === sylInput.value.trim().toLowerCase() ? 'true' : 'false');
-    b.addEventListener('click', function () {
-      sylInput.value = text;
-      var all = $('chips').children;
-      for (var i = 0; i < all.length; i++) {
-        all[i].setAttribute('aria-pressed', all[i].textContent === text ? 'true' : 'false');
+  // Built with Muse Code: desk-camera mode for the glasses loop.
+  // Photo mode above is unchanged. The desk camera polls the shared room,
+  // and each new capture command runs the same clean -> reference -> /api/paper
+  // path as a held photo, then posts the verdict back to the room.
+  var roomInput = $('room'), deskBtn = $('desk'), preview = $('preview');
+  var photoCard = $('photoCard'), refCap = $('refCap'), deskTarget = $('deskTarget'), moreBtn = $('moreLetters');
+  var deskStatusEl = $('deskStatus');
+  var desk = { on: false, timer: 0, lastCmd: null, skipFirst: false, stream: null, lock: null, working: false };
+
+  function dsay(msg, isError) {
+    deskStatusEl.textContent = msg;
+    deskStatusEl.classList.toggle('error', !!isError);
+  }
+
+  var roomParams = new URLSearchParams(window.location.search);
+  if (roomParams.get('room')) { roomInput.value = roomParams.get('room'); }
+
+  function roomCode() {
+    var c = (roomInput.value || '').trim().toUpperCase();
+    return /^[A-Z0-9]{4,8}$/.test(c) ? c : null;
+  }
+
+  function stopDesk(silent) {
+    desk.on = false;
+    if (desk.timer) { clearInterval(desk.timer); desk.timer = 0; }
+    if (desk.stream) {
+      desk.stream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) { /* already stopped */ } });
+      desk.stream = null;
+    }
+    if (desk.lock) { try { desk.lock.release(); } catch (e) { /* already released */ } desk.lock = null; }
+    preview.hidden = true;
+    try { preview.srcObject = null; } catch (e) { /* older browser */ }
+    deskBtn.textContent = 'Use as desk camera';
+    desk.lastCmd = null;
+    desk.skipFirst = false;
+    photoCard.hidden = false;
+    deskTarget.hidden = true;
+    seen.hidden = true;
+    try { seen.removeAttribute('src'); } catch (e) { /* older browser */ }
+    seenCap.textContent = 'Your photo';
+    cleaned = null;
+    result.hidden = true;
+    verdictEl.textContent = '';
+    tipsEl.innerHTML = '';
+    timingsEl.textContent = '';
+    refWrap.hidden = true;
+    refreshReference();
+    if (!silent) { dsay('Desk camera off.'); }
+  }
+
+  function startDesk() {
+    var code = roomCode();
+    if (!code) { dsay('Type the room code shown in the glasses.', true); return; }
+    if (!pack) { dsay('The stroke pack is not loaded yet. Wait a moment and try again.', true); return; }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      dsay('This browser cannot open the camera. Try iPhone Safari or Chrome.', true);
+      return;
+    }
+    dsay('Starting the camera…');
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }).then(function (s) {
+      desk.stream = s;
+      preview.srcObject = s;
+      preview.hidden = false;
+      var played = null;
+      try { played = preview.play(); } catch (e) { played = null; }
+      return (played && played.catch) ? played.catch(function () {}) : null;
+    }).then(function () {
+      desk.on = true;
+      desk.lastCmd = null;
+      desk.skipFirst = true;
+      deskBtn.textContent = 'Stop desk camera';
+      photoCard.hidden = true;
+      result.hidden = true;
+      verdictEl.textContent = '';
+      tipsEl.innerHTML = '';
+      timingsEl.textContent = '';
+      deskTarget.hidden = true;
+      refWrap.hidden = false;
+      refImg.hidden = true;
+      refCap.textContent = 'Waiting for the glasses…';
+      if (desk.timer) { clearInterval(desk.timer); }
+      desk.timer = setInterval(function () { pollRoom(code); }, 1000);
+      pollRoom(code);
+      if (navigator.wakeLock && navigator.wakeLock.request) {
+        dsay('Room ' + code + '. Watching for the glasses…');
+        navigator.wakeLock.request('screen').then(function (l) { desk.lock = l; }).catch(function () {});
+      } else {
+        dsay('Room ' + code + '. Watching for the glasses… Keep the screen on.');
       }
-      onSyllableChanged();
+    }).catch(function () {
+      stopDesk(true);
+      dsay('Could not open the camera. Allow camera access and try again.', true);
     });
-    $('chips').appendChild(b);
+  }
+
+  deskBtn.addEventListener('click', function () {
+    if (desk.on) { stopDesk(); return; }
+    startDesk();
+  });
+
+  function pollRoom(code) {
+    if (!desk.on || desk.working) { return; }
+    fetch('/api/room?code=' + encodeURIComponent(code), { cache: 'no-store' }).then(function (res) {
+      return res.ok ? res.json() : null;
+    }).then(function (room) {
+      if (!desk.on || !room || !room.command || room.command.id === desk.lastCmd) { return; }
+      desk.lastCmd = room.command.id;
+      if (desk.skipFirst) { desk.skipFirst = false; return; } // that command predates desk mode: record it, don't check it
+      handleCommand(code, room.command);
+    }).catch(function () { /* the next tick retries */ });
+  }
+
+  function postResult(code, id, verdict, tips, ms) {
+    return fetch('/api/room', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: code, action: 'result', id: id, verdict: verdict, tips: tips, ms: ms })
+    }).catch(function () { /* the glasses time out with their own message */ });
+  }
+
+  function cameraLive() {
+    return !!(desk.stream && desk.stream.getTracks().some(function (t) { return t.readyState === 'live'; }));
+  }
+
+  function answerCommand(code, cmd, verdict, tips, ms) {
+    var found = { verdict: verdict, tips: tips, ms: ms };
+    showResult(found);
+    return postResult(code, cmd.id, found.verdict, found.tips, found.ms);
+  }
+
+  function handleCommand(code, cmd) {
+    desk.working = true;
+    dsay('Checking "' + cmd.target + '"…');
+    deskTarget.textContent = 'Checking: ' + cmd.target;
+    deskTarget.hidden = false;
+    refWrap.hidden = false;
+    refImg.hidden = true;
+    refCap.textContent = 'Reference: ' + cmd.target;
+    result.hidden = false;
+    verdictEl.textContent = 'Checking your writing…';
+    tipsEl.innerHTML = '';
+    timingsEl.textContent = '';
+    var t0 = Date.now();
+    var RETRY_TIP = 'I couldn’t check that one. Press Check again.';
+    if (!pack || !oneToken(cmd.target)) {
+      answerCommand(code, cmd, 'retry', [RETRY_TIP], Date.now() - t0);
+      dsay('Could not check that one.', true);
+      deskTarget.hidden = true;
+      desk.working = false;
+      return;
+    }
+    if (!cameraLive()) {
+      stopDesk(true);
+      answerCommand(code, cmd, 'retry', [RETRY_TIP], Date.now() - t0);
+      dsay('The phone camera stopped. Tap Use as desk camera again.', true);
+      desk.working = false;
+      return;
+    }
+    var cleaned = null;
+    try { cleaned = preview.videoWidth ? SulatPhoto.clean(preview) : null; } catch (e) { cleaned = null; }
+    var noshow = { verdict: 'retry', tips: ['I couldn’t see your writing. Write darker and keep the paper in view.'], ms: Date.now() - t0 };
+    if (!cleaned) {
+      showResult(noshow);
+      postResult(code, cmd.id, noshow.verdict, noshow.tips, noshow.ms);
+      dsay('Done. Watching for the glasses…');
+      deskTarget.hidden = true;
+      desk.working = false;
+      return;
+    }
+    seen.src = cleaned.dataURL;
+    seen.hidden = false;
+    seenCap.textContent = 'What Sulat sees';
+    renderReference(cmd.target).then(function (refURL) {
+      refImg.src = refURL;
+      refImg.hidden = false;
+      refWrap.hidden = false;
+      return fetch('/api/paper', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target: cmd.target, photo: cleaned.dataURL, reference: refURL })
+      }).then(function (res) {
+        if (!res.ok) { return readError(res, 'Paper check failed').then(function (e) { throw e; }); }
+        return res.json();
+      });
+    }).then(function (found) {
+      showResult(found);
+      return postResult(code, cmd.id, found.verdict, found.tips || [], found.ms == null ? 0 : found.ms);
+    }).catch(function (err) {
+      answerCommand(code, cmd, 'retry', ['I couldn’t check that one. Press Check again.'], Date.now() - t0);
+      dsay('Something went wrong: ' + err.message, true);
+    }).then(function () {
+      dsay('Done. Watching for the glasses…');
+      deskTarget.hidden = true;
+      desk.working = false;
+    });
+  }
+
+  // The lock is released when the page hides; ask again on return while on duty.
+  document.addEventListener('visibilitychange', function () {
+    if (!desk.on || document.hidden) { return; }
+    if (navigator.wakeLock && navigator.wakeLock.request) {
+      navigator.wakeLock.request('screen').then(function (l) { desk.lock = l; }).catch(function () {});
+    }
+  });
+
+  function buildChips(list) {
+    var box = $('chips');
+    box.innerHTML = '';
+    list.forEach(function (text) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = text;
+      b.setAttribute('aria-pressed', text === sylInput.value.trim().toLowerCase() ? 'true' : 'false');
+      b.addEventListener('click', function () {
+        sylInput.value = text;
+        var all = box.children;
+        for (var i = 0; i < all.length; i++) {
+          all[i].setAttribute('aria-pressed', all[i].textContent === text ? 'true' : 'false');
+        }
+        onSyllableChanged();
+      });
+      box.appendChild(b);
+    });
+  }
+  buildChips(chipTargets());
+  moreBtn.addEventListener('click', function () {
+    moreMode = !moreMode;
+    if (moreMode && !pack) {
+      moreMode = false;
+      say('Still loading the stroke pack…');
+      return;
+    }
+    buildChips(moreMode ? baseLetters() : chipTargets());
+    moreBtn.textContent = moreMode ? 'Fewer letters' : 'More letters';
   });
   sylInput.addEventListener('change', onSyllableChanged);
 

@@ -92,18 +92,42 @@
       sizes.push(sz); boxes.push(b);
     }
     if (!n) { return null; }
-    var big = 0, k;
-    for (k = 1; k <= n; k++) { if (sizes[k] > big) { big = sizes[k]; } }
+    // The edge of the paper or the desk shows up as one long, thin, straight line. That is never writing,
+    // so drop it before anything else (otherwise it shrinks the letter and drags specks in with it).
+    var k;
+    for (k = 1; k <= n; k++) {
+      var e = boxes[k], bw = e.x1 - e.x0 + 1, bh = e.y1 - e.y0 + 1;
+      var long = Math.max(bw, bh), thin = Math.min(bw, bh);
+      var spans = bw > 0.6 * (w - 2 * m) || bh > 0.6 * (h - 2 * m);
+      if (spans && thin < 0.06 * long) { sizes[k] = 0; }
+    }
+    // A paper edge can also arrive broken into a few pieces. Any long, thin, straight piece is set aside
+    // while we find the letter, and only kept if it sits inside the letter (a real straight stroke).
+    var lineLike = new Uint8Array(n + 1), anyOther = false;
+    for (k = 1; k <= n; k++) {
+      if (!sizes[k]) { continue; }
+      var q = boxes[k], qw = q.x1 - q.x0 + 1, qh = q.y1 - q.y0 + 1, ql = Math.max(qw, qh);
+      if (Math.min(qw, qh) < 0.06 * ql && ql > 0.2 * Math.min(w, h)) { lineLike[k] = 1; } else { anyOther = true; }
+    }
+    if (!anyOther) { lineLike = new Uint8Array(n + 1); }
+    var big = 0;
+    for (k = 1; k <= n; k++) { if (!lineLike[k] && sizes[k] > big) { big = sizes[k]; } }
     if (big < 30) { return null; }
     // The letter: the big pieces. Small pieces count only if they sit close to it (a vowel dot or cross).
     var keep = new Uint8Array(n + 1), C = { x0: w, y0: h, x1: 0, y1: 0 };
     for (k = 1; k <= n; k++) {
-      if (sizes[k] >= 0.15 * big) {
+      if (!lineLike[k] && sizes[k] > 0 && sizes[k] >= 0.15 * big) {
         keep[k] = 1; var bb = boxes[k];
         C.x0 = Math.min(C.x0, bb.x0); C.y0 = Math.min(C.y0, bb.y0); C.x1 = Math.max(C.x1, bb.x1); C.y1 = Math.max(C.y1, bb.y1);
       }
     }
     var cs = Math.max(C.x1 - C.x0, C.y1 - C.y0);
+    for (k = 1; k <= n; k++) {
+      if (!lineLike[k]) { continue; }
+      var L = boxes[k], pad = 0.1 * cs;
+      var inside = L.x0 >= C.x0 - pad && L.x1 <= C.x1 + pad && L.y0 >= C.y0 - pad && L.y1 <= C.y1 + pad;
+      if (inside) { keep[k] = 1; } else { sizes[k] = 0; }
+    }
     for (k = 1; k <= n; k++) {
       // A real vowel dot is a solid blob; a fleck of dust or a pen tap is tiny. Ignore the tiny ones.
       if (keep[k] || sizes[k] < Math.max(6, 0.006 * big)) { continue; }
