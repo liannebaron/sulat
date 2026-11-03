@@ -62,6 +62,7 @@
   #deskStatus { min-height: 1.4em; margin: 10px 0 0; color: var(--quiet); }
   #deskStatus.error { color: var(--warn); }
   #preview { display: block; width: 100%; max-width: 320px; height: auto; margin-top: 12px; border: 1px solid var(--line); border-radius: 10px; background: #000; }
+  #deskTarget { font: 400 30px Georgia, "Times New Roman", serif; margin: 0 0 8px; }
   .compare { display: flex; gap: 12px; margin-top: 12px; }
   .compare figure { flex: 1 1 0; min-width: 0; max-width: 180px; margin: 0; }
   .compare figcaption { margin-top: 6px; color: var(--quiet); font-size: 14px; }
@@ -80,10 +81,11 @@
   <h1>Paper check</h1>
   <p class="lede">Write one Baybayin syllable on paper, photograph it, and Sulat tells you what to fix.</p>
 
-  <section class="card">
-    <label class="field" for="syl">Syllable</label>
+  <section class="card" id="photoCard">
+    <label class="field" for="syl">Or type any syllable</label>
     <input id="syl" type="text" value="ma" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="8">
     <div class="chips" id="chips"></div>
+    <button id="moreLetters" type="button">More letters</button>
     <p class="tip">Use a dark pen, write big, and fill the frame.</p>
     <div class="row">
       <label class="filebtn" id="photoLabel" for="photo">Take a photo</label>
@@ -94,6 +96,7 @@
 
   <section class="card">
     <h2>Desk camera</h2>
+    <div id="deskTarget" hidden></div>
     <p class="tip">Put this phone on a stand above the paper, facing down at your writing. The glasses will ask it to check.</p>
     <label class="field" for="room">Room code (shown in the glasses)</label>
     <input id="room" type="text" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="8" placeholder="e.g. 4821">
@@ -118,7 +121,7 @@
       </figure>
       <figure id="refWrap" hidden>
         <div class="slot"><img id="ref" alt="Reference glyph"></div>
-        <figcaption>Reference</figcaption>
+        <figcaption id="refCap">Reference</figcaption>
       </figure>
     </div>
     <p id="status" role="status" aria-live="polite"></p>
@@ -138,7 +141,21 @@
   var photoLabel = $('photoLabel'), refWrap = $('refWrap'), refImg = $('ref');
   var refCache = null; // { target, url } — the reference also sent to the API
 
-  var CHIPS = ['ma', 'ka', 'ki', 'ta', 'sa', 'la'];
+  var moreMode = false;
+  function chipTargets() {
+    var q = null;
+    try { q = new URLSearchParams(window.location.search).get('text'); } catch (e) { q = null; }
+    var out = [];
+    Sulat.syllabify(q || 'mahal kita').forEach(function (w) {
+      w.tokens.forEach(function (t) {
+        if (out.indexOf(t.text) < 0) { out.push(t.text); }
+      });
+    });
+    return out.length ? out : ['ma'];
+  }
+  function baseLetters() {
+    return Object.keys(pack.glyphs).filter(function (g) { return g.indexOf('mark-') !== 0; });
+  }
   var pack = null;
   var cleaned = null; // { canvas, dataURL } from SulatPhoto.clean
   var busy = false;
@@ -212,7 +229,9 @@
       if ((sylInput.value || '').trim().toLowerCase() !== target) { return; }
       refCache = { target: target, url: url };
       refImg.src = url;
+      refImg.hidden = false;
       refWrap.hidden = false;
+      refCap.textContent = 'Reference';
     }).catch(function () {
       refWrap.hidden = true;
       refCache = null;
@@ -319,7 +338,9 @@
       : renderReference(target).then(function (refURL) {
         refCache = { target: target, url: refURL };
         refImg.src = refURL;
+        refImg.hidden = false;
         refWrap.hidden = false;
+        refCap.textContent = 'Reference';
         return refURL;
       });
     refP.then(function (refURL) {
@@ -346,6 +367,7 @@
   // and each new capture command runs the same clean -> reference -> /api/paper
   // path as a held photo, then posts the verdict back to the room.
   var roomInput = $('room'), deskBtn = $('desk'), preview = $('preview');
+  var photoCard = $('photoCard'), refCap = $('refCap'), deskTarget = $('deskTarget'), moreBtn = $('moreLetters');
   var deskStatusEl = $('deskStatus');
   var desk = { on: false, timer: 0, lastCmd: null, skipFirst: false, stream: null, lock: null, working: false };
 
@@ -375,6 +397,13 @@
     deskBtn.textContent = 'Use as desk camera';
     desk.lastCmd = null;
     desk.skipFirst = false;
+    photoCard.hidden = false;
+    deskTarget.hidden = true;
+    seen.hidden = true;
+    try { seen.removeAttribute('src'); } catch (e) { /* older browser */ }
+    seenCap.textContent = 'Your photo';
+    cleaned = null;
+    refreshReference();
     if (!silent) { dsay('Desk camera off.'); }
   }
 
@@ -399,6 +428,11 @@
       desk.lastCmd = null;
       desk.skipFirst = true;
       deskBtn.textContent = 'Stop desk camera';
+      photoCard.hidden = true;
+      deskTarget.hidden = true;
+      refWrap.hidden = false;
+      refImg.hidden = true;
+      refCap.textContent = 'Waiting for the glasses…';
       if (desk.timer) { clearInterval(desk.timer); }
       desk.timer = setInterval(function () { pollRoom(code); }, 1000);
       pollRoom(code);
@@ -452,6 +486,11 @@
   function handleCommand(code, cmd) {
     desk.working = true;
     dsay('Checking "' + cmd.target + '"…');
+    deskTarget.textContent = 'Checking: ' + cmd.target;
+    deskTarget.hidden = false;
+    refWrap.hidden = false;
+    refImg.hidden = true;
+    refCap.textContent = 'Reference: ' + cmd.target;
     result.hidden = false;
     verdictEl.textContent = 'Checking your writing…';
     tipsEl.innerHTML = '';
@@ -461,6 +500,7 @@
     if (!pack || !oneToken(cmd.target)) {
       answerCommand(code, cmd, 'retry', [RETRY_TIP], Date.now() - t0);
       dsay('Could not check that one.', true);
+      deskTarget.hidden = true;
       desk.working = false;
       return;
     }
@@ -478,6 +518,7 @@
       showResult(noshow);
       postResult(code, cmd.id, noshow.verdict, noshow.tips, noshow.ms);
       dsay('Done. Watching for the glasses…');
+      deskTarget.hidden = true;
       desk.working = false;
       return;
     }
@@ -485,6 +526,9 @@
     seen.hidden = false;
     seenCap.textContent = 'What Sulat sees';
     renderReference(cmd.target).then(function (refURL) {
+      refImg.src = refURL;
+      refImg.hidden = false;
+      refWrap.hidden = false;
       return fetch('/api/paper', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -501,6 +545,7 @@
       dsay('Something went wrong: ' + err.message, true);
     }).then(function () {
       dsay('Done. Watching for the glasses…');
+      deskTarget.hidden = true;
       desk.working = false;
     });
   }
@@ -513,20 +558,35 @@
     }
   });
 
-  CHIPS.forEach(function (text) {
-    var b = document.createElement('button');
-    b.type = 'button';
-    b.textContent = text;
-    b.setAttribute('aria-pressed', text === sylInput.value.trim().toLowerCase() ? 'true' : 'false');
-    b.addEventListener('click', function () {
-      sylInput.value = text;
-      var all = $('chips').children;
-      for (var i = 0; i < all.length; i++) {
-        all[i].setAttribute('aria-pressed', all[i].textContent === text ? 'true' : 'false');
-      }
-      onSyllableChanged();
+  function buildChips(list) {
+    var box = $('chips');
+    box.innerHTML = '';
+    list.forEach(function (text) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = text;
+      b.setAttribute('aria-pressed', text === sylInput.value.trim().toLowerCase() ? 'true' : 'false');
+      b.addEventListener('click', function () {
+        sylInput.value = text;
+        var all = box.children;
+        for (var i = 0; i < all.length; i++) {
+          all[i].setAttribute('aria-pressed', all[i].textContent === text ? 'true' : 'false');
+        }
+        onSyllableChanged();
+      });
+      box.appendChild(b);
     });
-    $('chips').appendChild(b);
+  }
+  buildChips(chipTargets());
+  moreBtn.addEventListener('click', function () {
+    moreMode = !moreMode;
+    if (moreMode && !pack) {
+      moreMode = false;
+      say('Still loading the stroke pack…');
+      return;
+    }
+    buildChips(moreMode ? baseLetters() : chipTargets());
+    moreBtn.textContent = moreMode ? 'Fewer letters' : 'More letters';
   });
   sylInput.addEventListener('change', onSyllableChanged);
 
