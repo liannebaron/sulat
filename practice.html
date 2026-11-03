@@ -172,6 +172,19 @@
     { text: 'magandang umaga', en: 'good morning' },
     { text: 'paalam', en: 'goodbye' }
   ];
+  // Built with Muse Code: Tagalog voice clips recorded by my mother.
+  // Sound never blocks the lesson: a failed play is silently ignored.
+  var AUDIO_PHRASES = { 'mahal kita': 1, salamat: 1, kumusta: 1, 'magandang umaga': 1, paalam: 1 };
+  function playAudio(name) {
+    try {
+      var p = new Audio('audio/' + name + '.mp3').play();
+      if (p && p.catch) { p.catch(function () { /* no sound: keep going */ }); }
+    } catch (e) { /* audio unsupported: keep going */ }
+  }
+  function playPhrase(text) {
+    var key = String(text || '').toLowerCase().trim().replace(/\s+/g, ' ');
+    if (AUDIO_PHRASES[key]) { playAudio(key.replace(/ /g, '-')); }
+  }
   var PAGE_VERSION = 'practice-nov2b';
   var SPEED = 0.75;          // a little slower than Show me, for learners
   var INK = 24;              // stroke width in glyph units
@@ -570,7 +583,10 @@
     if (memory) {
       r.tryAttempts += 1;
       // A first try only counts as from memory if the learner did not peek before it.
-      if (r.tryFirst === null) { r.tryFirst = res.pass && !r.peeks; }
+      if (r.tryFirst === null) {
+        r.tryFirst = res.pass && !r.peeks;
+        if (r.tryFirst) { playAudio('magaling'); }
+      }
       if (res.pass) { r.tryPassed = true; }
       ghost = res.transform || alignedGhost();   // reveal the correct glyph over their attempt
     } else {
@@ -706,6 +722,7 @@
     $('doneCard').hidden = true;
     $('lessonCard').hidden = false;
     resize();
+    playPhrase(st.text);
     goShow();
     resize();
   }

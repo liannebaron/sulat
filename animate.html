@@ -154,6 +154,25 @@
     { text: 'paalam', en: 'goodbye' }
   ];
 
+  // Built with Muse Code: Tagalog voice clips recorded by my mother.
+  // Sound never blocks the lesson: a failed play is silently ignored.
+  var AUDIO_PHRASES = { 'mahal kita': 1, salamat: 1, kumusta: 1, 'magandang umaga': 1, paalam: 1 };
+  function playAudio(name) {
+    try {
+      var p = new Audio('audio/' + name + '.mp3').play();
+      if (p && p.catch) { p.catch(function () { /* no sound: keep going */ }); }
+    } catch (e) { /* audio unsupported: keep going */ }
+  }
+  function playPhrase(text) {
+    var key = String(text || '').toLowerCase().trim().replace(/\s+/g, ' ');
+    if (AUDIO_PHRASES[key]) { playAudio(key.replace(/ /g, '-')); }
+  }
+  var lastPhraseAudio = '';
+  function playPhraseOnce(text) {
+    var key = String(text || '').toLowerCase().trim().replace(/\s+/g, ' ');
+    if (key && key !== lastPhraseAudio) { lastPhraseAudio = key; playPhrase(key); }
+  }
+
   var params = new URLSearchParams(window.location.search);
   var glasses = params.get('view') === 'glasses';
   document.documentElement.classList.toggle('glasses', glasses);
@@ -234,6 +253,7 @@
     });
     status(lay.missing.length ? 'Missing from the stroke pack: ' + lay.missing.join(', ') : '');
     ctrl.play({ speed: speed });
+    playPhrase(input.value);
   }
 
   // On the glasses each syllable gets its own screen, so it stays large and learners can follow.
@@ -267,10 +287,11 @@
       ariaLabel: u.tok.text + ' in Baybayin'
     });
     ctrl.play({ speed: speed });
+    playPhraseOnce(input.value);
     setLensUI();
   }
 
-  function replay() { if (ctrl) { ctrl.play({ speed: speed }); } }
+  function replay() { if (ctrl) { ctrl.play({ speed: speed }); } playPhrase(input.value); }
 
   // Built with Muse Code: the Replay button follows the lens mode, so Enter
   // (or Neural Band Select) always presses the focused button for this screen.
@@ -384,6 +405,7 @@
       ? orderTips(found.tips).slice(0, 1)
       : orderTips(found.tips);
     $('lensNote').innerHTML = shown.map(escLensTip).join('<br>');
+    if (found.verdict === 'good') { playAudio('magaling'); }
     setLensUI();
   }
 
