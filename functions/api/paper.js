@@ -134,12 +134,7 @@ export async function onRequestPost(context) {
     'The expected vowel mark is ' + markText(tok) + '. ' +
     'Is the handwritten character clear, with the expected mark? Reply with JSON only.';
 
-  // TODO: remove the effort override before going public.
-  var effort = null;
-  try { effort = new URL(context.request.url).searchParams.get('effort'); } catch (e) { /* ignore */ }
-  if (effort !== 'low' && effort !== 'medium' && effort !== 'high') { effort = null; }
-
-  function chatBody(effortValue, maxTokens) {
+  function chatBody(maxTokens, lowEffort) {
     var b = {
       model: 'muse-spark-1.3',
       max_completion_tokens: maxTokens,
@@ -157,18 +152,18 @@ export async function onRequestPost(context) {
           }
         ]
       };
-    if (effortValue) { b.reasoning_effort = effortValue; }
+    if (lowEffort) { b.reasoning_effort = 'low'; }
     return JSON.stringify(b);
   }
 
-  async function metaCall(effortValue, maxTokens) {
+  async function metaCall(maxTokens, lowEffort) {
     var res = await fetch(META_URL, {
       method: 'POST',
       headers: {
         Authorization: 'Bearer ' + apiKey,
         'Content-Type': 'application/json'
       },
-      body: chatBody(effortValue, maxTokens)
+      body: chatBody(maxTokens, lowEffort)
     });
     var d = null;
     try { d = await res.json(); } catch (e) { /* handled by caller */ }
@@ -188,26 +183,15 @@ export async function onRequestPost(context) {
       }
     }
     return {
-      finish: data && data.choices && data.choices[0] && data.choices[0].finish_reason,
-      usage: data && data.usage,
       content: c,
       parsed: parseVerdict(c, target.toLowerCase())
     };
   }
 
-  // TODO: remove the debug usage before going public.
-  function usageOf(usage) {
-    if (!usage) { return null; }
-    var out = { completion_tokens: usage.completion_tokens != null ? usage.completion_tokens : null };
-    var det = usage.completion_tokens_details || usage.completion_details;
-    if (det && det.reasoning_tokens != null) { out.reasoning_tokens = det.reasoning_tokens; }
-    return out;
-  }
-
   var started = Date.now();
   var first;
   try {
-    first = await metaCall(effort, 6000);
+    first = await metaCall(6000, false);
   } catch (e) {
     return Response.json({ error: 'Could not reach the paper service. Try again.' }, { status: 502 });
   }
@@ -223,28 +207,22 @@ export async function onRequestPost(context) {
   }
   var once = replyOf(first.data);
   if (!once.parsed) {
+    // One automatic retry with low reasoning effort, then a friendly error.
     var second = null;
     try {
-      second = await metaCall('low', 3000);
+      second = await metaCall(3000, true);
     } catch (e) {
       second = null;
     }
     var msTotal = Date.now() - started;
     var twice = (second && second.res.ok) ? replyOf(second.data) : null;
     if (twice && twice.parsed) {
-      return Response.json({ verdict: twice.parsed.verdict, tips: twice.parsed.tips, ms: msTotal, usage: usageOf(twice.usage) });
+      return Response.json({ verdict: twice.parsed.verdict, tips: twice.parsed.tips, ms: msTotal });
     }
-    twice = twice || once;
-    // TODO: remove the debug text before going public.
     return Response.json({
       error: 'The feedback came back unclear. Try again with a sharper photo.',
-      debug: {
-        finish_reason: (twice.finish) || null,
-        content_length: twice.content.length,
-        content_head: twice.content.slice(0, 300)
-      },
       ms: msTotal
     }, { status: 502 });
   }
-  return Response.json({ verdict: once.parsed.verdict, tips: once.parsed.tips, ms: ms, usage: usageOf(once.usage) });
+  return Response.json({ verdict: once.parsed.verdict, tips: once.parsed.tips, ms: ms });
 }

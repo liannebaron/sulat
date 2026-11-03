@@ -5,7 +5,7 @@ Run from the repo root (needs only Node, no installs):
     node tests/score_test4.js
 
 Should end with `SCORER OK` (about 3 to 4 minutes). It stress-tests the current scorer (`sulat-score.js`,
-version `legible-1`) with simulated hands: fair traces, loose beginner attempts, reversed or reordered or
+version `legible-2`) with simulated hands: fair traces, loose beginner attempts, reversed or reordered or
 split strokes (should pass, with a tip), and wrong letters, scribbles, straight lines for curves, shifted or
 shrunk traces, missing strokes and missing or wrong-side marks (should fail). Use `TRIALS=25 node tests/score_test4.js`
 for a bigger run (slow).
