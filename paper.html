@@ -473,9 +473,13 @@
     if (!cleaned) {
       showResult(noshow);
       postResult(code, cmd.id, noshow.verdict, noshow.tips, noshow.ms);
+      dsay('Done. Watching for the glasses…');
       desk.working = false;
       return;
     }
+    seen.src = cleaned.dataURL;
+    seen.hidden = false;
+    seenCap.textContent = 'What Sulat sees';
     renderReference(cmd.target).then(function (refURL) {
       return fetch('/api/paper', {
         method: 'POST',
@@ -492,6 +496,7 @@
       answerCommand(code, cmd, 'retry', ['I couldn’t check that one. Press Check again.'], Date.now() - t0);
       dsay('Something went wrong: ' + err.message, true);
     }).then(function () {
+      dsay('Done. Watching for the glasses…');
       desk.working = false;
     });
   }
