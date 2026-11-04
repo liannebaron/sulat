@@ -5,66 +5,94 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Sulat</title>
 <style>
-  /* Built for the Ray-Ban Display: black is see-through, so everything is bright white,
-     large, and one idea per screen. Also works in any browser. */
-  :root { --ink: #fff; }
+  /* Built for the Ray-Ban Display: black is see-through, so everything is drawn in light
+     lines, large, one idea per screen. Fonts are local files. Also works in any browser. */
+  @font-face { font-family: 'Figtree'; src: url('fonts/figtree.woff2') format('woff2'); font-weight: 300 900; font-display: swap; }
+  @font-face { font-family: 'Caveat'; src: url('fonts/caveat.woff2') format('woff2'); font-weight: 400 700; font-display: swap; }
+  :root { --ink: #F5ECD7; }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: #000; color: var(--ink); }
-  body { font-family: Georgia, "Times New Roman", serif; }
+  body { font-family: Figtree, system-ui, -apple-system, "Segoe UI", sans-serif; }
   main {
     width: min(100vw, 600px);
     height: min(100vh, 600px);
     margin: 0 auto;
-    padding: 28px 32px;
+    padding: 22px 30px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    gap: 10px;
   }
-  header { display: flex; justify-content: space-between; align-items: baseline; }
-  h1 { margin: 0; font-size: 44px; font-weight: 400; }
-  h1 small { margin-left: 12px; font-size: 26px; opacity: 0.85; }
-  #count { font-size: 26px; }
-  .pick { display: flex; align-items: center; gap: 12px; }
+  header { display: flex; justify-content: space-between; align-items: center; min-height: 40px; }
+  header img { height: 40px; width: auto; display: block; opacity: 0.92; }
+  #count { font-size: 18px; color: rgba(245,236,215,0.6); letter-spacing: 0.04em; }
+
+  .marina { display: flex; align-items: flex-end; gap: 12px; }
+  .marina img { width: 104px; height: auto; display: block; flex: none; }
+  .marina p { margin: 0 0 12px; flex: 1; padding: 12px 16px; border: 2px solid #C5E3A1; border-radius: 20px 20px 20px 4px; }
+  .marina .hi { display: block; font-family: Caveat, Figtree, cursive; font-size: 36px; font-weight: 700; line-height: 1; }
+  .marina .say { display: block; font-size: 21px; line-height: 1.3; margin-top: 4px; white-space: nowrap; }
+
+  .pick { display: flex; align-items: center; gap: 8px; }
   .pick .text { flex: 1; text-align: center; }
-  #phrase { font-size: 58px; line-height: 1.1; }
-  #english { margin-top: 10px; font-size: 32px; opacity: 0.85; }
+  #phrase { font-size: 52px; font-weight: 700; line-height: 1.05; color: #FFFFFF; text-transform: uppercase; letter-spacing: 0.03em; }
+  #english { margin-top: 8px; font-size: 26px; color: rgba(245,236,215,0.75); }
+  #dots { display: flex; justify-content: center; gap: 8px; margin-top: 14px; }
+  #dots span { width: 10px; height: 10px; border-radius: 5px; border: 2px solid rgba(245,236,215,0.4); }
+  #dots span.on { background: #C5E3A1; border-color: #C5E3A1; }
   .step {
-    flex: none; width: 64px; min-height: 88px;
-    font: 44px Georgia, serif; color: var(--ink);
+    flex: none; width: 48px; min-height: 88px;
+    font: 44px Figtree, system-ui, sans-serif; color: rgba(245,236,215,0.5);
     background: transparent; border: 0; cursor: pointer;
   }
-  .bottom { display: flex; align-items: center; gap: 24px; }
-  #start {
-    min-width: 190px; min-height: 88px; padding: 0 24px;
-    font: 30px Georgia, "Times New Roman", serif; color: var(--ink);
-    background: transparent; border: 3px solid var(--ink); border-radius: 16px; cursor: pointer;
+
+  /* Key legend: uniform keys; gold flashes on the key just pressed. */
+  .bottom { display: flex; justify-content: center; align-items: flex-start; gap: 14px; }
+  .key, #start { min-width: 96px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .key .cap, #start .cap {
+    width: 64px; height: 40px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; color: var(--ink); border: 2px solid rgba(245,236,215,0.5);
+    transition: border-color 0.15s, color 0.15s, box-shadow 0.15s;
   }
-  #start:focus-visible { outline: 4px solid var(--ink); outline-offset: 5px; }
-  #hint { font-size: 24px; line-height: 1.3; }
-  .talk { position: fixed; right: 12px; bottom: 8px; font: 14px -apple-system, Helvetica, Arial, sans-serif; opacity: 0.6; }
+  #start .cap { font-size: 17px; font-weight: 700; }
+  .key .lbl, #start .lbl { font-size: 18px; color: rgba(245,236,215,0.8); white-space: nowrap; transition: color 0.15s; }
+  #start { background: transparent; border: 0; padding: 0; margin: 0; font: inherit; cursor: pointer; }
+  #start:focus, #start:focus-visible { outline: none; }
+  .key.pressed .cap, #start.pressed .cap { border-color: #F6C85C; color: #F6C85C; box-shadow: 0 0 0 3px rgba(246,200,92,0.28); }
+  .key.pressed .lbl, #start.pressed .lbl { color: #F6C85C; }
+
+  .talk { position: fixed; right: 12px; bottom: 8px; font: 13px Figtree, system-ui, sans-serif; opacity: 0.45; }
   .talk a { color: var(--ink); }
-  @media (max-height: 560px) { #phrase { font-size: 44px; } #english { font-size: 26px; } }
+  @media (max-height: 560px) { #phrase { font-size: 42px; } #english { font-size: 22px; } .marina img { width: 84px; } }
 </style>
 </head>
 <body>
 <main>
   <header>
-    <h1>Sulat<small>Tagalog</small></h1>
+    <img src="img/wordmark-cream.png" alt="Sulat">
     <span id="count" aria-live="polite"></span>
   </header>
 
+  <div class="marina">
+    <img src="img/marina-lens.webp" alt="Marina, your teacher">
+    <p><span class="hi">Kumusta!</span><span class="say">Pick a phrase to learn.</span></p>
+  </div>
+
   <div class="pick">
-    <button class="step" id="prev" type="button" tabindex="-1" aria-label="Previous phrase">‹</button>
+    <button class="step" id="prev" type="button" tabindex="-1" aria-label="Previous phrase">&#8249;</button>
     <div class="text" aria-live="polite">
       <div id="phrase"></div>
       <div id="english"></div>
+      <div id="dots" aria-hidden="true"></div>
     </div>
-    <button class="step" id="next" type="button" tabindex="-1" aria-label="Next phrase">›</button>
+    <button class="step" id="next" type="button" tabindex="-1" aria-label="Next phrase">&#8250;</button>
   </div>
 
   <div class="bottom">
-    <button id="start" type="button">Show me</button>
-    <div id="hint">← → choose a phrase<br>Select to start</div>
+    <div class="key" id="keyPrev"><span class="cap">&#8592;</span><span class="lbl">Prev</span></div>
+    <button id="start" type="button"><span class="cap">Enter</span><span class="lbl">Start</span></button>
+    <div class="key" id="keyNext"><span class="cap">&#8594;</span><span class="lbl">Next</span></div>
   </div>
 </main>
 <div class="talk"><a href="talk.html">Talk to Sulat</a> · <a href="hello.html">Input test</a></div>
@@ -91,19 +119,33 @@
   function show() {
     i = (i + PHRASES.length) % PHRASES.length;
     $('phrase').textContent = PHRASES[i].text;
+    $('phrase').style.fontSize = PHRASES[i].text.length > 10 ? '40px' : ''; // long phrases stay on one line
     $('english').textContent = PHRASES[i].en;
     $('count').textContent = (i + 1) + ' / ' + PHRASES.length;
+    $('dots').innerHTML = PHRASES.map(function (p, k) { return '<span' + (k === i ? ' class="on"' : '') + '></span>'; }).join('');
   }
 
   function start() {
     go('animate.html?view=glasses&text=' + encodeURIComponent(PHRASES[i].text));
   }
 
+  // Gold flashes on the key just pressed.
+  function flash(id) {
+    var el = $(id);
+    if (!el) { return; }
+    el.classList.add('pressed');
+    clearTimeout(el.__flash);
+    el.__flash = setTimeout(function () { el.classList.remove('pressed'); }, 320);
+  }
+
   // The Neural Band arrives as arrow keys, and Select as a click on the focused button.
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); i += 1; show(); }
-    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); i -= 1; show(); }
-    else if ((e.key === 'Enter' || e.key === ' ') && e.target !== $('start')) { e.preventDefault(); start(); }
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); flash('keyNext'); i += 1; show(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); flash('keyPrev'); i -= 1; show(); }
+    else if (e.key === 'Enter' || e.key === ' ') {
+      flash('start');
+      if (e.target !== $('start')) { e.preventDefault(); start(); }
+    }
   });
   $('prev').addEventListener('click', function () { i -= 1; show(); });
   $('next').addEventListener('click', function () { i += 1; show(); });
