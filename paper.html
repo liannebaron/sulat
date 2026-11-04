@@ -467,10 +467,17 @@
     fetch('/api/room?code=' + encodeURIComponent(code), { cache: 'no-store' }).then(function (res) {
       return res.ok ? res.json() : null;
     }).then(function (room) {
-      if (!desk.on || !room || !room.command || room.command.id === desk.lastCmd) { return; }
-      desk.lastCmd = room.command.id;
-      if (desk.skipFirst) { desk.skipFirst = false; return; } // that command predates desk mode: record it, don't check it
-      handleCommand(code, room.command);
+      if (!desk.on || !room) { return; }
+      var cmd = room.command;
+      if (desk.skipFirst) {
+        // First look at the room: remember whatever is already there (or nothing). Never check it.
+        desk.skipFirst = false;
+        desk.lastCmd = cmd ? cmd.id : null;
+        return;
+      }
+      if (!cmd || cmd.id === desk.lastCmd) { return; }
+      desk.lastCmd = cmd.id;
+      handleCommand(code, cmd);
     }).catch(function () { /* the next tick retries */ });
   }
 
