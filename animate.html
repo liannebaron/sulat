@@ -116,8 +116,8 @@
   #lensSyl { font-size: 44px; font-weight: 700; line-height: 1; color: #FFFFFF; }
   #lensNote { font-size: 22px; line-height: 1.3; color: rgba(245,236,215,0.88); min-height: 1.3em; }
   #lensNote .hl { color: #FF8E72; font-weight: 600; }
-  #lensBottom { display: flex; justify-content: center; align-items: flex-start; gap: 12px; }
-  .key, #lensReplay { width: 96px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  #lensBottom { display: flex; justify-content: center; align-items: flex-start; gap: 14px; }
+  .key, #lensReplay { min-width: 96px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
   .key .cap, #lensReplay .cap {
     width: 64px; height: 40px; box-sizing: border-box; border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
@@ -126,7 +126,7 @@
   }
   #lensReplay .cap { font-size: 17px; font-weight: 700; }
   .key .lbl, #lensReplay .lbl { font-size: 18px; color: rgba(245,236,215,0.8); white-space: nowrap; transition: color 0.15s; }
-  .key.off { visibility: hidden; }
+  .key.off { display: none; }
   /* The one real button: Enter (or Neural Band Select) always presses it. */
   #lensReplay { background: transparent; border: 0; padding: 0; margin: 0; font: inherit; cursor: pointer; }
   #lensReplay:focus, #lensReplay:focus-visible { outline: none; }
@@ -160,6 +160,30 @@
   #waitHead { font-family: Caveat, Figtree, cursive; font-size: 46px; font-weight: 700; line-height: 1; color: #F5ECD7; }
   #waitStep { font-size: 22px; color: rgba(245,236,215,0.88); min-height: 1.3em; }
   #waitHint { font-size: 18px; color: rgba(245,236,215,0.6); }
+  /* Verdict: Marina answers. Green = right, gold = almost, red = try again. */
+  #lensVerdict { display: none; align-items: center; gap: 18px; }
+  #lens[data-mode="verdict"] #lensVerdict { display: flex; }
+  #lens[data-mode="verdict"] #lensWord, #lens[data-mode="verdict"] #lensCount,
+  #lens[data-mode="verdict"] #lensStage, #lens[data-mode="verdict"] #lensLabel { display: none; }
+  #lensVerdict > img { width: 170px; height: auto; display: block; flex: none; }
+  .vcol { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .vheadwrap { position: relative; }
+  #vHead { font-family: Caveat, Figtree, cursive; font-size: 84px; font-weight: 700; line-height: 0.9; display: inline-block; white-space: nowrap; }
+  #vHead.good { color: #C5E3A1; }
+  #vHead.almost { color: #F6C85C; }
+  #vHead.retry { color: #FF8E72; }
+  #vHead.pop { animation: pop 0.7s cubic-bezier(.2,.9,.3,1.2) both; transform-origin: left center; }
+  @keyframes pop { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); } }
+  #vTips { font-size: 22px; line-height: 1.35; color: rgba(245,236,215,0.9); }
+  /* A sampaguita opens over the word and sprays gold pollen (right answers only). */
+  #vBurst { position: absolute; right: 52px; top: -6px; width: 0; height: 0; display: none; pointer-events: none; }
+  #vBurst.on { display: block; }
+  #vBurst img { position: absolute; left: -30px; top: -26px; width: 60px; height: auto; animation: bloomin 3.4s ease-out infinite; transform-origin: 50% 50%; }
+  #vBurst .spray { position: absolute; left: 0; top: 0; width: var(--d, 6px); height: var(--d, 6px); margin: calc(var(--d, 6px) / -2) 0 0 calc(var(--d, 6px) / -2); border-radius: 50%; background: #F6C85C; box-shadow: 0 0 6px rgba(246,200,92,0.7); opacity: 0; animation: spray 3.4s cubic-bezier(.12,.75,.3,1) infinite; }
+  #vBurst .spray.petal { width: 13px; height: 6px; margin: -3px 0 0 -6px; border-radius: 6px / 5px; background: #F5ECD7; box-shadow: none; rotate: var(--r); }
+  @keyframes spray { 0% { transform: translate(0, 0) scale(0.3); opacity: 0; } 8% { opacity: 1; } 55% { opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(1); opacity: 0; } }
+  @keyframes bloomin { 0% { transform: scale(0) rotate(-70deg); opacity: 0; } 28% { transform: scale(1.12) rotate(5deg); opacity: 1; } 38% { transform: scale(1) rotate(24deg); } 72% { transform: scale(1) rotate(80deg); opacity: 1; } 100% { transform: scale(1) rotate(115deg); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { #vHead.pop, #vBurst img, #vBurst .spray { animation: none; } #vBurst .spray { opacity: 0; } }
   /* Each mode shows only what it needs. */
   #lens[data-mode="show"] #lensWord, #lens[data-mode="show"] #lensCount { display: none; }
   #lens:not([data-mode="show"]) #lensSyl { display: none; }
@@ -202,7 +226,7 @@
   <div id="lensCount"></div>
   <div id="lensPair">
     <img src="img/marina-lens.webp" alt="Marina">
-    <p><span>Type this code on your phone.</span><span>When its camera is on, press Enter.</span></p>
+    <p><span>Type this code on your phone.</span><span>When the camera is on,</span><span>press Enter to take a photo.</span></p>
   </div>
   <div id="lensCode" aria-label="Phone code"></div>
   <div id="lensWait" role="status">
@@ -213,6 +237,13 @@
     <div id="waitHead"></div>
     <div id="waitStep"></div>
     <div id="waitHint">Keep the paper still. Usually under a minute.</div>
+  </div>
+  <div id="lensVerdict" role="status">
+    <img src="img/marina-lens.webp" alt="Marina">
+    <div class="vcol">
+      <div class="vheadwrap"><span id="vHead"></span><div id="vBurst" aria-hidden="true"><img src="img/sampaguita-lens.webp" alt=""><span class="spray petal" style="--dx:55px;--dy:10px;--r:-3deg;animation-delay:0.69s"></span><span class="spray" style="--dx:73px;--dy:24px;--d:4px;animation-delay:0.65s"></span><span class="spray" style="--dx:44px;--dy:52px;--d:7px;animation-delay:0.61s"></span><span class="spray" style="--dx:40px;--dy:48px;--d:9px;animation-delay:0.66s"></span><span class="spray" style="--dx:31px;--dy:64px;--d:4px;animation-delay:0.69s"></span><span class="spray" style="--dx:8px;--dy:81px;--d:4px;animation-delay:0.74s"></span><span class="spray petal" style="--dx:-9px;--dy:68px;--r:99deg;animation-delay:0.66s"></span><span class="spray" style="--dx:-32px;--dy:82px;--d:5px;animation-delay:0.68s"></span><span class="spray" style="--dx:-41px;--dy:77px;--d:4px;animation-delay:0.63s"></span><span class="spray" style="--dx:-43px;--dy:41px;--d:5px;animation-delay:0.61s"></span><span class="spray" style="--dx:-71px;--dy:35px;--d:7px;animation-delay:0.71s"></span><span class="spray" style="--dx:-70px;--dy:12px;--d:5px;animation-delay:0.64s"></span><span class="spray petal" style="--dx:-56px;--dy:-7px;--r:200deg;animation-delay:0.68s"></span><span class="spray" style="--dx:-75px;--dy:-35px;--d:6px;animation-delay:0.70s"></span><span class="spray" style="--dx:-32px;--dy:-26px;--d:5px;animation-delay:0.67s"></span><span class="spray" style="--dx:-18px;--dy:-38px;--d:4px;animation-delay:0.67s"></span><span class="spray" style="--dx:1px;--dy:-38px;--d:6px;animation-delay:0.68s"></span><span class="spray" style="--dx:6px;--dy:-51px;--d:7px;animation-delay:0.67s"></span><span class="spray petal" style="--dx:14px;--dy:-37px;--r:285deg;animation-delay:0.64s"></span><span class="spray" style="--dx:36px;--dy:-22px;--d:6px;animation-delay:0.70s"></span><span class="spray" style="--dx:83px;--dy:-33px;--d:6px;animation-delay:0.72s"></span><span class="spray" style="--dx:89px;--dy:-5px;--d:7px;animation-delay:0.65s"></span></div></div>
+      <div id="vTips"></div>
+    </div>
   </div>
   <div id="lensStage"></div>
   <div id="lensLabel"><span id="lensSyl"></span><div id="lensNote"></div></div>
@@ -439,6 +470,27 @@
       waitTimers.push(setTimeout(function () { if (lensMode === 'checking') { $('waitStep').textContent = st[1]; } }, st[0]));
     });
   }
+  var lastVerdict = null;
+  function nextLabel() {
+    var units = lensUnits();
+    if (!units.length) { return 'Next glyph'; }
+    var nx = units[unitIndex + 1];
+    return nx ? 'Next: ' + nx.tok.text : 'Finish';
+  }
+  // Enter always presses the lens button; this is what the button does in each mode.
+  function lensPrimary() {
+    if (lensMode === 'show') { replay(); return; }
+    if (lensMode === 'checking') { return; } // ignore while checking
+    if (lensMode === 'verdict' && lastVerdict === 'good') {
+      var units = lensUnits();
+      if (unitIndex + 1 >= units.length) { go('index.html'); return; }
+      unitIndex += 1;
+      renderLensUnit();
+      return;
+    }
+    var text = currentTok() || tryTok;
+    if (text) { postCapture(text); }
+  }
   function setLensUI() {
     var b = $('lensReplay');
     var lab = $('lensReplayLabel');
@@ -447,7 +499,8 @@
     if (lensMode === 'checking') { lab.textContent = 'Checking…'; b.disabled = true; }
     else {
       b.disabled = false;
-      lab.textContent = lensMode === 'try' ? 'Check my work' : (lensMode === 'verdict' ? 'Check again' : 'Replay');
+      lab.textContent = lensMode === 'try' ? 'Check my work'
+        : (lensMode === 'verdict' ? (lastVerdict === 'good' ? nextLabel() : 'Check again') : 'Replay');
     }
     var L = LEGEND[lensMode] || LEGEND.show;
     setKey('keyUp', L.up); setKey('keyDown', L.down); setKey('keyLeft', L.left); setKey('keyRight', L.right);
@@ -563,12 +616,27 @@
     clearTimeout(lensTimer);
     lensMode = 'verdict';
     $('lensWord').textContent = found.verdict === 'good' ? 'Magaling!'
-      : (found.verdict === 'almost' ? 'Almost' : 'Try again');
+      : (found.verdict === 'almost' ? 'Almost!' : 'Try again');
     var shown = found.verdict === 'good'
       ? orderTips(found.tips).slice(0, 1)
       : orderTips(found.tips);
     $('lensNote').innerHTML = shown.map(escLensTip).join('<br>');
     if (found.verdict === 'good') { playAudio('magaling'); }
+    lastVerdict = found.verdict;
+    var head = $('vHead');
+    head.textContent = $('lensWord').textContent;
+    head.className = found.verdict === 'good' ? 'good' : (found.verdict === 'almost' ? 'almost' : 'retry');
+    void head.offsetWidth;
+    head.classList.add('pop');
+    $('vTips').innerHTML = $('lensNote').innerHTML;
+    var burst = $('vBurst');
+    burst.classList.remove('on');
+    if (found.verdict === 'good') {
+      void burst.offsetWidth;
+      burst.classList.add('on');
+      var curChip = document.querySelector('#lensChips .chip.cur');
+      if (curChip) { curChip.classList.remove('cur'); curChip.classList.add('done'); }
+    }
     setLensUI();
   }
 
@@ -590,14 +658,7 @@
 
   $('go').addEventListener('click', renderPhrase);
   $('replay').addEventListener('click', replay);
-  $('lensReplay').addEventListener('click', function () {
-    if (lensMode === 'show') { replay(); }
-    else if (lensMode === 'checking') { /* ignore while checking */ }
-    else {
-      var text = currentTok() || tryTok;
-      if (text) { postCapture(text); }
-    }
-  });
+  $('lensReplay').addEventListener('click', lensPrimary);
   $('slow').addEventListener('click', function () {
     speed = speed < 1 ? 1 : 0.55;
     $('slow').setAttribute('aria-pressed', speed < 1 ? 'true' : 'false');
@@ -624,12 +685,7 @@
       else if (e.key === 'ArrowUp') { e.preventDefault(); if (lensMode === 'show') { go('index.html'); } else { renderLensUnit(); } }
       else if ((e.key === 'Enter' || e.key === ' ') && e.target !== $('lensReplay')) {
         e.preventDefault();
-        if (lensMode === 'show') { replay(); }
-        else if (lensMode === 'checking') { /* ignore while checking */ }
-        else {
-          var text = currentTok() || tryTok;
-          if (text) { postCapture(text); }
-        }
+        lensPrimary();
       }
     } else if (e.key === 'Enter' && e.target === document.body) {
       e.preventDefault();
