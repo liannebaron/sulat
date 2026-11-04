@@ -71,34 +71,70 @@
   #breakdown { margin: 6px 0 0; padding-left: 20px; color: var(--quiet); }
   #status { min-height: 1.4em; color: var(--quiet); margin: 8px 0 0; }
 
-  /* Glasses view: 600x600, black is see-through on the Display, one word per card. */
-  html.glasses, html.glasses body { background: #000; color: #f2efe8; }
+  /* Glasses view: 600x600, black is see-through on the Display. Lines, not fills.
+     Fonts are local files so Show me never needs the network beyond the pack. */
+  @font-face { font-family: 'Figtree'; src: url('fonts/figtree.woff2') format('woff2'); font-weight: 300 900; font-display: swap; }
+  @font-face { font-family: 'Caveat'; src: url('fonts/caveat.woff2') format('woff2'); font-weight: 400 700; font-display: swap; }
+  html.glasses, html.glasses body { background: #000; color: #F5ECD7; }
   html.glasses .wrap { display: none; }
   #lens { display: none; }
   html.glasses #lens {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    gap: 10px;
+    box-sizing: border-box;
     width: min(100vw, 600px);
     height: min(100vh, 600px);
     margin: 0 auto;
-    padding: 28px 32px;
-    font-family: Georgia, "Times New Roman", serif;
+    padding: 22px 30px;
+    font-family: Figtree, system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: #F5ECD7;
   }
-  #lensWord { font-size: 44px; color: #fff; }
-  #lensCount { font-size: 26px; color: #fff; }
-  #lensStage svg { display: block; width: 100%; height: auto; max-height: 270px; color: #fff; }
-  #lensNote { font-size: 26px; line-height: 1.25; color: #fff; min-height: 66px; text-wrap: balance; }
-  #lensStage .label { fill: #fff; font-family: Georgia, serif; }
-  #lensStage .label.active { opacity: 1; }
-  #lensBottom { display: flex; align-items: center; gap: 24px; }
+  #lensTop { display: flex; justify-content: space-between; align-items: center; min-height: 40px; }
+  #lensLogo { height: 40px; width: auto; display: block; opacity: 0.92; }
+  #lensGloss { font-size: 20px; color: rgba(245,236,215,0.75); }
+  #lensChips { display: flex; justify-content: center; align-items: center; gap: 6px; }
+  .chip {
+    height: 38px; min-width: 38px; padding: 0 8px; box-sizing: border-box; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 600;
+    border: 2px solid rgba(245,236,215,0.4); color: rgba(245,236,215,0.4);
+  }
+  .chip.done { border-color: #C5E3A1; color: #C5E3A1; }
+  .chip.cur { border: 3px solid #F5ECD7; border-bottom: 6px solid #FF8E72; color: #F5ECD7; font-weight: 700; }
+  .chipGap { width: 8px; flex: none; }
+  #lensWord { font-size: 30px; font-weight: 600; text-wrap: balance; }
+  #lensCount { font-size: 24px; }
+  #lensStage { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  #lensStage svg { display: block; width: 100%; height: 100%; max-height: 280px; color: #F5ECD7; }
+  #lensStage .mark { color: #FF8E72; }
+  #lensLabel { display: flex; align-items: baseline; gap: 16px; padding: 0 4px; }
+  #lensSyl { font-size: 48px; font-weight: 700; line-height: 1; flex: none; }
+  #lensNote { font-size: 22px; line-height: 1.3; color: rgba(245,236,215,0.88); text-wrap: balance; min-height: 1.3em; }
+  #lensNote .hl { color: #FF8E72; font-weight: 600; }
+  #lensBottom { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; text-align: center; align-items: start; }
+  .key { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .key .cap, #lensReplay .cap {
+    height: 40px; min-width: 44px; padding: 0 8px; box-sizing: border-box; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; font-size: 22px;
+    border: 2px solid rgba(245,236,215,0.5);
+  }
+  .key .lbl, #lensReplay .lbl { font-size: 18px; color: rgba(245,236,215,0.8); white-space: nowrap; }
+  .key.off { visibility: hidden; }
+  /* The one real button: Enter (or Neural Band Select) always presses it. Gold = what Enter does. */
   #lensReplay {
-    min-width: 190px; min-height: 88px; padding: 0 24px;
-    font: 28px Georgia, "Times New Roman", serif; color: #fff;
-    background: transparent; border: 3px solid #fff; border-radius: 16px;
+    background: transparent; border: 0; padding: 0; margin: 0; font: inherit; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 6px; color: #F6C85C;
   }
-  #lensReplay:focus-visible { outline: 4px solid #fff; outline-offset: 5px; }
-  #lensHint { font-size: 24px; line-height: 1.3; color: #fff; }
+  #lensReplay .cap { border: 4px solid #F6C85C; box-shadow: 0 0 0 3px rgba(246,200,92,0.28); color: #F6C85C; font-size: 17px; font-weight: 700; }
+  #lensReplay .lbl { color: #F6C85C; font-weight: 700; }
+  #lensReplay:focus { outline: none; }
+  #lensReplay:focus-visible .cap { box-shadow: 0 0 0 5px rgba(246,200,92,0.5); }
+  #lensReplay:disabled { opacity: 0.55; cursor: default; }
+  /* Each mode shows only what it needs. */
+  #lens[data-mode="show"] #lensWord, #lens[data-mode="show"] #lensCount { display: none; }
+  #lens:not([data-mode="show"]) #lensSyl { display: none; }
 </style>
 </head>
 <body>
@@ -128,17 +164,24 @@
   </div>
 </div>
 
-<div id="lens" aria-live="polite">
-  <div class="row" style="justify-content:space-between">
-    <span id="lensWord"></span>
-    <span id="lensCount"></span>
+<div id="lens" aria-live="polite" data-mode="show">
+  <div id="lensTop">
+    <img id="lensLogo" src="img/wordmark-cream.png" alt="Sulat">
+    <span id="lensGloss"></span>
   </div>
+  <div id="lensChips" aria-label="Progress through the phrase"></div>
+  <div id="lensWord"></div>
+  <div id="lensCount"></div>
   <div id="lensStage"></div>
-  <div id="lensNote"></div>
+  <div id="lensLabel"><span id="lensSyl"></span><div id="lensNote"></div></div>
   <div id="lensBottom">
-    <button id="lensReplay" type="button">Replay</button>
-    <div id="lensHint">← → next letter · ↓ try on paper<br>↑ back to phrases</div>
+    <div class="key" id="keyUp"><span class="cap">&#8593;</span><span class="lbl">Phrases</span></div>
+    <div class="key" id="keyDown"><span class="cap">&#8595;</span><span class="lbl">Write it</span></div>
+    <div class="key" id="keyLeft"><span class="cap">&#8592;</span><span class="lbl">Prev</span></div>
+    <button id="lensReplay" type="button"><span class="cap">Enter</span><span class="lbl" id="lensReplayLabel">Replay</span></button>
+    <div class="key" id="keyRight"><span class="cap">&#8594;</span><span class="lbl">Next</span></div>
   </div>
+  <div id="lensHint" hidden></div>
 </div>
 
 <script src="sulat-engine.js"></script>
@@ -265,6 +308,32 @@
     return out;
   }
 
+  // Glasses header: the phrase's meaning, the syllable chips, and a plain note that highlights the mark.
+  function glossFor(text) {
+    var key = String(text || '').toLowerCase().trim().replace(/\s+/g, ' ');
+    for (var k = 0; k < STARTERS.length; k++) { if (STARTERS[k].text === key) { return STARTERS[k].en; } }
+    return '';
+  }
+  function renderChips(units, idx) {
+    var box = $('lensChips');
+    box.innerHTML = '';
+    units.forEach(function (un, k) {
+      if (k > 0 && un.wi !== units[k - 1].wi) {
+        var gap = document.createElement('span');
+        gap.className = 'chipGap';
+        box.appendChild(gap);
+      }
+      var c = document.createElement('span');
+      c.className = 'chip' + (k < idx ? ' done' : (k === idx ? ' cur' : ''));
+      c.textContent = un.tok.text;
+      box.appendChild(c);
+    });
+  }
+  function noteHtml(tok) {
+    var t = Sulat.describe(tok).replace(/^[^:]*:\s*/, '');
+    return escLensTip(t).replace(/(dot above|dot below|cross below)/, '<span class="hl">$1</span>');
+  }
+
   function renderLensUnit() {
     if (!pack) { return; }
     words = Sulat.syllabify(input.value);
@@ -276,12 +345,14 @@
     var u = units[unitIndex];
     $('lensWord').textContent = u.word;
     $('lensCount').textContent = (unitIndex + 1) + ' / ' + units.length;
-    $('lensNote').textContent = Sulat.describe(u.tok);
+    renderChips(units, unitIndex);
+    $('lensGloss').textContent = glossFor(input.value);
+    $('lensSyl').textContent = u.tok.text;
+    $('lensNote').innerHTML = noteHtml(u.tok);
     var lay = Sulat.layout(pack, [{ text: u.tok.text, tokens: [u.tok] }], { pad: 90 });
     var lensInk = Math.max(26, Math.min(60, lay.viewBox[2] / 80));
     ctrl = Sulat.render($('lensStage'), pack, lay, {
-      labels: true,
-      labelSize: 150,
+      labels: false,
       ink: lensInk,
       dotInk: lensInk * 1.3,
       ariaLabel: u.tok.text + ' in Baybayin'
@@ -295,16 +366,28 @@
 
   // Built with Muse Code: the Replay button follows the lens mode, so Enter
   // (or Neural Band Select) always presses the focused button for this screen.
+  var LEGEND = {
+    show: { up: 'Phrases', down: 'Write it', left: 'Prev', right: 'Next' },
+    try: { up: 'Show me', down: '', left: 'Watch again', right: 'Next' },
+    checking: { up: '', down: '', left: 'Back', right: '' },
+    verdict: { up: '', down: '', left: 'Show me again', right: 'Next' }
+  };
+  function setKey(id, label) {
+    var k = $(id);
+    k.classList.toggle('off', !label);
+    k.querySelector('.lbl').textContent = label || '';
+  }
   function setLensUI() {
     var b = $('lensReplay');
-    if (lensMode === 'checking') { b.textContent = 'Checking…'; b.disabled = true; }
+    var lab = $('lensReplayLabel');
+    $('lens').setAttribute('data-mode', lensMode);
+    if (lensMode === 'checking') { lab.textContent = 'Checking…'; b.disabled = true; }
     else {
       b.disabled = false;
-      b.textContent = lensMode === 'try' ? 'Check' : (lensMode === 'verdict' ? 'Check again' : 'Replay');
+      lab.textContent = lensMode === 'try' ? 'Check' : (lensMode === 'verdict' ? 'Check again' : 'Replay');
     }
-    $('lensHint').innerHTML = lensMode === 'show'
-      ? '← → next letter · ↓ try on paper<br>↑ back to phrases'
-      : (lensMode === 'verdict' ? '→ next letter · ← Show me again' : '← back to Show me');
+    var L = LEGEND[lensMode] || LEGEND.show;
+    setKey('keyUp', L.up); setKey('keyDown', L.down); setKey('keyLeft', L.left); setKey('keyRight', L.right);
     b.focus();
   }
 
