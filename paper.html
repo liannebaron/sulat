@@ -25,14 +25,14 @@
   .bubble .say { white-space: nowrap; font-size: 15px; margin-top: 6px; }
   .bubble .say span { display: block; }
   body.desk .only-photo, body:not(.desk) .only-desk { display: none !important; }
-  /* the two cards change places by mode */
+  /* Marina's answer sits at the very top and replaces her first instruction while it is showing. */
   .paper > .marina { order: 1; }
+  #result { order: 1; }
+  .paper:has(#result:not([hidden])) > .marina { display: none; }
   #compareCard { order: 2; }
   #photoCard { order: 3; }
   #deskCard { order: 3; }
-  #result { order: 4; }
   body.desk #deskCard { order: 2; }
-  body.desk #result { order: 3; }
   body.desk #compareCard { order: 4; }
   .panel { padding: 14px 16px; background-color: var(--cream); border: 1.5px solid var(--tan); border-radius: 18px; box-shadow: 0 3px 0 var(--tan), 0 12px 20px -14px rgba(91,70,30,0.45); display: flex; flex-direction: column; gap: 10px; }
   .lab { font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
@@ -58,7 +58,7 @@
   #preview { display: block; width: 100%; height: auto; max-height: 46vh; object-fit: contain; border-radius: 11px; background: #000; }
   .onglasses { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 14px; background: #F3EBD8; font-size: 15px; line-height: 1.35; }
   .onglasses .k { flex: none; height: 34px; padding: 0 10px; border: 2px solid var(--leaf); border-radius: 9px; display: flex; align-items: center; font-size: 14px; font-weight: 700; color: var(--leaf); }
-  #deskStatus, #status { margin: 0; min-height: 1.3em; text-align: center; font-size: 14px; color: var(--muted); }
+  #deskStatus, #status { margin: 0; min-height: 1.3em; text-align: center; font-size: 16px; font-weight: 700; color: var(--leaf); }
   #deskStatus.error, #status.error { color: #A8402E; }
   /* Marina's answer */
   #result { display: flex; align-items: flex-end; gap: 6px; }
@@ -71,6 +71,11 @@
   #tips { margin: 6px 0 0; padding: 0; list-style: none; font-size: 15px; line-height: 1.35; }
   #tips li { margin: 3px 0; }
   #timings { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+  #resultCta { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+  #another { min-height: 48px; border-radius: 14px; border: 0; background: var(--leaf); color: var(--cream); font: 700 16px Figtree, sans-serif; box-shadow: 0 3px 0 var(--leaf-dark); cursor: pointer; touch-action: manipulation; white-space: nowrap; }
+  #deskNext { margin: 0; font-size: 15px; line-height: 1.3; }
+  #deskNext b { display: block; color: var(--leaf); font-size: 16px; }
+  #deskNext span { display: block; font-size: 13px; color: var(--quiet); font-style: italic; }
   #timings:empty { display: none; }
   /* your script and Marina's, side by side */
   .compare { display: flex; gap: 12px; }
@@ -148,6 +153,10 @@
       <h2 id="verdict"></h2>
       <ul id="tips"></ul>
       <p id="timings"></p>
+      <div id="resultCta" hidden>
+        <button id="another" type="button">Try another letter</button>
+        <p id="deskNext"><b>Try another letter on your glasses.</b><span>Enter checks again, → moves to the next letter.</span></p>
+      </div>
     </div>
   </section>
 
@@ -353,9 +362,13 @@
       tipsEl.appendChild(li);
     });
     timingsEl.textContent = found.ms != null ? 'Marina answered in ' + (found.ms / 1000).toFixed(1) + ' s' : '';
+    var deskPage = document.body.classList.contains('desk');
+    $('resultCta').hidden = false;
+    $('another').hidden = deskPage;
+    $('deskNext').hidden = !deskPage;
     say('');
-    try { result.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
-    catch (e) { if (result.scrollIntoView) { result.scrollIntoView(); } }
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    catch (e) { window.scrollTo(0, 0); }
   }
 
   checkBtn.addEventListener('click', function () {
@@ -550,6 +563,8 @@
     refImg.hidden = true;
     refCap.textContent = 'Marina’s ' + cmd.target;
     result.hidden = false;
+    $('resultCta').hidden = true;
+    verdictEl.className = '';
     verdictEl.textContent = 'Checking your writing…';
     tipsEl.innerHTML = '';
     timingsEl.textContent = '';
@@ -647,6 +662,18 @@
     moreBtn.textContent = moreMode ? 'Fewer letters' : 'More letters';
   });
   sylInput.addEventListener('change', onSyllableChanged);
+  $('another').addEventListener('click', function () {
+    var chips = $('chips').children, at = -1, i;
+    for (i = 0; i < chips.length; i++) { if (chips[i].getAttribute('aria-pressed') === 'true') { at = i; } }
+    cleaned = null;
+    photoInput.value = '';
+    seen.hidden = true;
+    seen.removeAttribute('src');
+    seenCap.textContent = 'Your script';
+    say('');
+    if (chips.length) { chips[(at + 1) % chips.length].click(); } else { onSyllableChanged(); }
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { window.scrollTo(0, 0); }
+  });
 
   (function () {
     var desk = document.body.classList.contains('desk');
