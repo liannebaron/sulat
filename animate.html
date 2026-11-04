@@ -112,8 +112,8 @@
   #lensStage { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; }
   #lensStage svg { display: block; width: 100%; height: 100%; max-height: 280px; color: #F5ECD7; }
   #lensStage .mark { color: #FF8E72; }
-  #lensLabel { display: flex; align-items: baseline; gap: 16px; padding: 0 4px; }
-  #lensSyl { font-size: 48px; font-weight: 700; line-height: 1; flex: none; color: #FFFFFF; }
+  #lensLabel { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
+  #lensSyl { font-size: 44px; font-weight: 700; line-height: 1; color: #FFFFFF; }
   #lensNote { font-size: 22px; line-height: 1.3; color: rgba(245,236,215,0.88); min-height: 1.3em; }
   #lensNote .hl { color: #FF8E72; font-weight: 600; }
   #lensBottom { display: flex; justify-content: center; align-items: flex-start; gap: 12px; }
@@ -332,12 +332,7 @@
     });
   }
   function noteHtml(tok) {
-    // Shorter wording for the lens so the note fits on one line (the phone keeps the full sentence).
-    var t = Sulat.describe(tok).replace(/^[^:]*:\s*/, '')
-      .replace(' (every letter already carries an a)', ' · every letter carries an a')
-      .replace(', which turns its a into i or e', ': a becomes i or e')
-      .replace(', which turns its a into u or o', ': a becomes u or o')
-      .replace(', which silences its a', ': silences the a');
+    var t = Sulat.describe(tok).replace(/^[^:]*:\s*/, '');
     return escLensTip(t).replace(/(dot above|dot below|cross below)/, '<span class="hl">$1</span>');
   }
 
