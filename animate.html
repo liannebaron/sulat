@@ -136,6 +136,7 @@
   .key.pressed .lbl, #lensReplay.pressed .lbl { color: #F6C85C; }
   /* Try screen: write it on paper, pair the phone, press Enter. */
   #lensWord .tok { color: #FF8E72; }
+  #lens[data-mode="try"] #lensWord { text-align: center; }
   #lensPair { display: none; align-items: flex-end; gap: 12px; }
   #lensPair img { width: 104px; height: auto; display: block; flex: none; }
   #lensPair p { margin: 0 0 12px; flex: 1; padding: 12px 16px; border: 2px solid #C5E3A1; border-radius: 20px 20px 20px 4px; font-size: 21px; line-height: 1.3; }
@@ -145,6 +146,20 @@
   #lensCode.long .digit { width: 58px; height: 80px; font-size: 44px; }
   #lens[data-mode="try"] #lensPair, #lens[data-mode="try"] #lensCode { display: flex; }
   #lens[data-mode="try"] #lensCount, #lens[data-mode="try"] #lensStage { display: none; }
+  /* Checking: Marina reads your page while the sampaguita breathes. */
+  #lensWait { display: none; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+  #lens[data-mode="checking"] #lensWait { display: flex; }
+  #lens[data-mode="checking"] #lensWord, #lens[data-mode="checking"] #lensCount,
+  #lens[data-mode="checking"] #lensStage, #lens[data-mode="checking"] #lensLabel { display: none; }
+  .bloom { position: relative; width: 200px; height: 200px; }
+  .bloom img { position: absolute; left: 25px; top: 32px; width: 150px; height: auto; display: block; animation: breathe 3.2s ease-in-out infinite; transform-origin: 50% 55%; }
+  .bloom svg { position: absolute; left: 0; top: 0; width: 200px; height: 200px; animation: orbit 9s linear infinite; transform-origin: 100px 100px; }
+  @keyframes breathe { 0%, 100% { transform: scale(0.94); opacity: 0.82; } 50% { transform: scale(1.03); opacity: 1; } }
+  @keyframes orbit { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .bloom img, .bloom svg { animation: none; } }
+  #waitHead { font-family: Caveat, Figtree, cursive; font-size: 46px; font-weight: 700; line-height: 1; color: #F5ECD7; }
+  #waitStep { font-size: 22px; color: rgba(245,236,215,0.88); min-height: 1.3em; }
+  #waitHint { font-size: 18px; color: rgba(245,236,215,0.6); }
   /* Each mode shows only what it needs. */
   #lens[data-mode="show"] #lensWord, #lens[data-mode="show"] #lensCount { display: none; }
   #lens:not([data-mode="show"]) #lensSyl { display: none; }
@@ -190,6 +205,15 @@
     <p><span>Type this code on your phone.</span><span>When its camera is on, press Enter.</span></p>
   </div>
   <div id="lensCode" aria-label="Phone code"></div>
+  <div id="lensWait" role="status">
+    <div class="bloom" aria-hidden="true">
+      <img src="img/sampaguita-lens.webp" alt="">
+      <svg viewBox="0 0 200 200"><circle cx="100" cy="7" r="5" fill="#F6C85C"></circle><circle cx="178" cy="68" r="4" fill="#F6C85C" fill-opacity="0.75"></circle><circle cx="148" cy="181" r="3" fill="#F6C85C" fill-opacity="0.55"></circle><circle cx="46" cy="179" r="2.5" fill="#F6C85C" fill-opacity="0.4"></circle><circle cx="10" cy="74" r="2" fill="#F6C85C" fill-opacity="0.3"></circle></svg>
+    </div>
+    <div id="waitHead"></div>
+    <div id="waitStep"></div>
+    <div id="waitHint">Keep the paper still. Usually under a minute.</div>
+  </div>
   <div id="lensStage"></div>
   <div id="lensLabel"><span id="lensSyl"></span><div id="lensNote"></div></div>
   <div id="lensBottom">
@@ -405,10 +429,21 @@
     clearTimeout(el.__flash);
     el.__flash = setTimeout(function () { el.classList.remove('pressed'); }, 320);
   }
+  var waitTimers = [];
+  function stopWaitSteps() { waitTimers.forEach(clearTimeout); waitTimers = []; }
+  function startWaitSteps(tok) {
+    stopWaitSteps();
+    $('waitHead').textContent = 'Marina is reading your ' + tok;
+    var steps = [[0, 'Lifting your page…'], [6000, 'Reading your strokes…'], [14000, 'Comparing it with ' + tok + '…'], [28000, 'Almost there…']];
+    steps.forEach(function (st) {
+      waitTimers.push(setTimeout(function () { if (lensMode === 'checking') { $('waitStep').textContent = st[1]; } }, st[0]));
+    });
+  }
   function setLensUI() {
     var b = $('lensReplay');
     var lab = $('lensReplayLabel');
     $('lens').setAttribute('data-mode', lensMode);
+    if (lensMode === 'checking') { startWaitSteps(tryTok); } else { stopWaitSteps(); }
     if (lensMode === 'checking') { lab.textContent = 'Checking…'; b.disabled = true; }
     else {
       b.disabled = false;
