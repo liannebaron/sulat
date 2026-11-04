@@ -191,6 +191,7 @@
 </head>
 <body>
 <div class="wrap">
+  <p style="margin:0 0 4px"><a href="index.html?view=phone">&larr; Sulat home</a></p>
   <h1>Show me</h1>
   <p class="lede">Type a word or phrase in Tagalog and watch it written in Baybayin, stroke by stroke, in the order the strokes are drawn.</p>
 
@@ -274,6 +275,7 @@
   // Sound never blocks the lesson: a failed play is silently ignored.
   var AUDIO_PHRASES = { 'mahal kita': 1, salamat: 1, kumusta: 1, 'magandang umaga': 1, paalam: 1 };
   function playAudio(name) {
+    try { if (window.localStorage.getItem('sulat.sound') === 'off') { return; } } catch (e) { /* storage unavailable: sound stays on */ }
     try {
       var p = new Audio('audio/' + name + '.mp3').play();
       if (p && p.catch) { p.catch(function () { /* no sound: keep going */ }); }
@@ -483,7 +485,7 @@
     if (lensMode === 'checking') { return; } // ignore while checking
     if (lensMode === 'verdict' && lastVerdict === 'good') {
       var units = lensUnits();
-      if (unitIndex + 1 >= units.length) { go('index.html'); return; }
+      if (unitIndex + 1 >= units.length) { go('glasses.html'); return; }
       unitIndex += 1;
       renderLensUnit();
       return;
@@ -682,7 +684,7 @@
         renderLensUnit();
       }
       else if (e.key === 'ArrowDown') { e.preventDefault(); openTry(); }
-      else if (e.key === 'ArrowUp') { e.preventDefault(); if (lensMode === 'show') { go('index.html'); } else { renderLensUnit(); } }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); if (lensMode === 'show') { go('glasses.html'); } else { renderLensUnit(); } }
       else if ((e.key === 'Enter' || e.key === ' ') && e.target !== $('lensReplay')) {
         e.preventDefault();
         lensPrimary();

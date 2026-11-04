@@ -1,0 +1,33 @@
+/* Sulat phone look: white ground, cream paper cards, tan edges, leaf green, hibiscus highlights.
+   Shared by every phone page. Fonts are local files. */
+@font-face { font-family: 'Figtree'; src: url('fonts/figtree.woff2') format('woff2'); font-weight: 300 900; font-display: swap; }
+@font-face { font-family: 'Caveat'; src: url('fonts/caveat.woff2') format('woff2'); font-weight: 400 700; font-display: swap; }
+:root { --leaf: #2F5A36; --leaf-dark: #1E3D24; --cream: #FBF6EA; --tan: #E4D3B0; --sage: #E3EFD2; --sage-edge: #B5D190; --ink: #1E2A1F; --quiet: #4A5A40; --muted: #6B6450; --hib: #D9553F; --gold: #E6B43C; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #FFFFFF; color: var(--ink); }
+body { font-family: Figtree, system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 16px; line-height: 1.4; }
+.page { max-width: 430px; margin: 0 auto; min-height: 100vh; padding: 14px 20px 26px; padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right)); display: flex; flex-direction: column; gap: 14px; }
+a { color: var(--leaf); }
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; }
+.bar img { width: 92px; height: auto; display: block; }
+.iconbtn { width: 44px; height: 44px; border-radius: 22px; border: 1.5px solid var(--tan); background: var(--cream); color: var(--leaf); display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; flex: none; touch-action: manipulation; }
+.iconbtn:focus-visible, .card:focus-visible, .btn:focus-visible, .pill:focus-visible { outline: 3px solid var(--leaf); outline-offset: 2px; }
+.iconbtn .off { display: none; }
+.iconbtn[aria-pressed="true"] .on { display: none; }
+.iconbtn[aria-pressed="true"] .off { display: block; }
+.bamboo { background-image: repeating-linear-gradient(90deg, rgba(185,151,95,0.07) 0 2px, transparent 2px 11px), repeating-linear-gradient(0deg, rgba(185,151,95,0.05) 0 1px, transparent 1px 64px); }
+.marina { display: flex; align-items: flex-end; gap: 6px; }
+.marina img { width: 104px; height: auto; display: block; flex: none; }
+.bubble { flex: 1; margin-bottom: 12px; padding: 12px 16px; background: var(--sage); border: 1.5px solid var(--sage-edge); border-radius: 20px 20px 20px 4px; box-shadow: 0 3px 0 var(--sage-edge); min-width: 0; }
+.bubble .hi { margin: 0; font-family: Caveat, cursive; font-size: 28px; font-weight: 700; line-height: 1; color: var(--leaf); white-space: nowrap; }
+.bubble .say { margin: 6px 0 0; font-size: 16px; line-height: 1.3; }
+.card { display: flex; gap: 14px; align-items: flex-start; padding: 16px; text-decoration: none; color: var(--ink); background-color: var(--cream); border: 1.5px solid var(--tan); border-radius: 18px; box-shadow: 0 3px 0 var(--tan), 0 12px 20px -14px rgba(91,70,30,0.45); }
+.card .badge { width: 52px; height: 52px; border-radius: 14px; background: var(--leaf); color: var(--cream); display: flex; align-items: center; justify-content: center; flex: none; }
+.card .title { display: block; font-size: 19px; font-weight: 700; }
+.card .desc { display: block; margin-top: 4px; font-size: 15px; line-height: 1.35; color: var(--quiet); }
+.tag { display: inline-block; margin-top: 8px; font-size: 13px; font-weight: 600; color: #A8402E; background: #FBE3DC; border-radius: 999px; padding: 3px 10px; }
+.btn { display: flex; align-items: center; justify-content: center; text-align: center; text-decoration: none; min-height: 56px; border-radius: 16px; border: 0; background: var(--leaf); color: var(--cream); font: 700 17px Figtree, sans-serif; box-shadow: 0 4px 0 var(--leaf-dark); cursor: pointer; touch-action: manipulation; }
+.btn.quiet { min-height: 44px; background: transparent; color: var(--leaf); box-shadow: none; font-weight: 600; font-size: 15px; text-decoration: underline; }
+.pill { min-height: 44px; padding: 0 12px; border-radius: 999px; font: 500 13px Figtree, sans-serif; white-space: nowrap; display: inline-flex; align-items: center; }
+.pill.on { background: var(--leaf); color: var(--cream); border: 0; font-weight: 600; padding: 0 14px; font-size: 14px; }
+.pill.soon { border: 1.5px dashed #CDBF9F; background: #FFFFFF; color: var(--muted); }

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sulat · Add Sulat to your glasses</title>
+<link rel="icon" href="img/favicon.png">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<link rel="stylesheet" href="phone.css">
+<style>
+  .marina img { width: 84px; }
+  .bubble .hi { font-size: 26px; }
+  .bubble .say { white-space: nowrap; font-size: 15px; }
+  .step { display: flex; gap: 12px; align-items: center; padding: 12px 14px; background-color: var(--cream); border: 1.5px solid var(--tan); border-radius: 16px; box-shadow: 0 3px 0 var(--tan); }
+  .step.tall { flex-direction: column; align-items: stretch; gap: 10px; }
+  .step .n { width: 30px; height: 30px; border-radius: 15px; background: var(--leaf); color: var(--cream); font-size: 15px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex: none; }
+  .step .row { display: flex; gap: 12px; align-items: center; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field .lab { font-size: 13px; font-weight: 600; color: var(--muted); }
+  .field .val { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 0 6px 0 12px; background: #FFFFFF; border: 1.5px solid var(--tan); border-radius: 12px; font-weight: 600; }
+  .field .val code { font: 600 15px Figtree, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .copy { min-height: 36px; padding: 0 12px; border: 0; border-radius: 9px; background: var(--leaf); color: var(--cream); font: 700 14px Figtree, sans-serif; cursor: pointer; touch-action: manipulation; }
+  .note { font-size: 13px; line-height: 1.35; color: var(--muted); }
+  .actions { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
+  .back { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 16px 0 10px; border-radius: 999px; background: var(--cream); border: 1.5px solid var(--tan); color: var(--leaf); font: 600 15px Figtree, sans-serif; text-decoration: none; align-self: flex-start; }
+</style>
+</head>
+<body>
+<div class="page" style="gap: 12px">
+  <div class="bar">
+    <a href="index.html?view=phone" aria-label="Sulat home"><img src="img/wordmark-green.png" alt="Sulat"></a>
+    <button type="button" class="iconbtn" id="sound" aria-pressed="false" aria-label="Sound on. Tap to turn off"><svg class="on" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"></path><path d="M16.5 8.5a5 5 0 0 1 0 7"></path><path d="M19 6a8.5 8.5 0 0 1 0 12"></path></svg><svg class="off" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"></path><path d="M17 9l5 6M22 9l-5 6"></path></svg></button>
+  </div>
+
+  <div class="marina">
+    <img src="img/marina.webp" alt="Marina">
+    <div class="bubble">
+      <p class="hi">Add me to your glasses</p>
+      <p class="say">Four quick steps, once.</p>
+    </div>
+  </div>
+
+  <div class="step bamboo"><span class="n">1</span><span>Open your glasses’ app on this phone and tap <b>Apps</b>.</span></div>
+  <div class="step bamboo"><span class="n">2</span><span>Scroll to <b>Web apps</b> and tap <b>Connect a web app</b>.</span></div>
+  <div class="step tall bamboo">
+    <div class="row"><span class="n">3</span><span>Enter these two, then tap <b>Connect</b>.</span></div>
+    <div class="field"><span class="lab">App name</span><div class="val"><span>Sulat</span></div></div>
+    <div class="field"><span class="lab">URL</span><div class="val"><code id="url"></code><button type="button" class="copy" id="copy">Copy</button></div></div>
+    <span class="note">Your phone will warn that web apps are a developer-mode feature. That’s normal for Sulat.</span>
+  </div>
+  <div class="step bamboo"><span class="n">4</span><span>Put on your glasses and open <b>Sulat</b> from your apps.</span></div>
+
+  <div class="actions">
+    <a class="btn" href="paper.html">Sulat is open on my glasses</a>
+    <a class="btn quiet" href="animate.html">No glasses? Practice on my phone</a>
+  </div>
+</div>
+<script>
+(function () {
+  'use strict';
+  var url = window.location.origin + '/g';
+  var urlEl = document.getElementById('url');
+  urlEl.textContent = url;
+  var copy = document.getElementById('copy');
+  copy.addEventListener('click', function () {
+    function done() { copy.textContent = 'Copied'; setTimeout(function () { copy.textContent = 'Copy'; }, 1600); }
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(url).then(done, fallback); } else { fallback(); }
+    function fallback() {
+      var r = document.createRange(); r.selectNodeContents(urlEl);
+      var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      try { document.execCommand('copy'); done(); } catch (e) { copy.textContent = 'Press and hold to copy'; }
+    }
+  });
+
+  // Sound on/off, remembered on this device (default on). Pages that play audio check the same key.
+  var soundBtn = document.getElementById('sound');
+  function soundIsOff() { try { return window.localStorage.getItem('sulat.sound') === 'off'; } catch (e) { return false; } }
+  function paintSound() { var off = soundIsOff(); soundBtn.setAttribute('aria-pressed', off ? 'true' : 'false'); soundBtn.setAttribute('aria-label', off ? 'Sound off. Tap to turn on' : 'Sound on. Tap to turn off'); }
+  soundBtn.addEventListener('click', function () { try { window.localStorage.setItem('sulat.sound', soundIsOff() ? 'on' : 'off'); } catch (e) { /* private mode */ } paintSound(); });
+  paintSound();
+})();
+</script>
+</body>
+</html>

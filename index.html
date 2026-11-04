@@ -3,158 +3,84 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Sulat</title>
+<title>Sulat · Handwriting Tutor</title>
+<script>
+  // The Ray-Ban Display opens this address. If the window is a small square (the lenses), go straight to the
+  // glasses launcher before anything is drawn. ?view=phone stays here; ?view=glasses always goes.
+  (function () {
+    var q = window.location.search;
+    if (/[?&]view=phone(&|$)/.test(q)) { return; }
+    var w = window.innerWidth, h = window.innerHeight;
+    if (/[?&]view=glasses(&|$)/.test(q) || (w <= 640 && h <= 640 && Math.abs(w - h) <= 80)) { window.location.replace('glasses.html'); }
+  })();
+</script>
+<link rel="icon" href="img/favicon.png">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2F5A36">
+<link rel="stylesheet" href="phone.css">
 <style>
-  /* Built for the Ray-Ban Display: black is see-through, so everything is drawn in light
-     lines, large, one idea per screen. Fonts are local files. Also works in any browser. */
-  @font-face { font-family: 'Figtree'; src: url('fonts/figtree.woff2') format('woff2'); font-weight: 300 900; font-display: swap; }
-  @font-face { font-family: 'Caveat'; src: url('fonts/caveat.woff2') format('woff2'); font-weight: 400 700; font-display: swap; }
-  :root { --ink: #F5ECD7; }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: #000; color: var(--ink); }
-  body { font-family: Figtree, system-ui, -apple-system, "Segoe UI", sans-serif; }
-  main {
-    width: min(100vw, 600px);
-    height: min(100vh, 600px);
-    margin: 0 auto;
-    padding: 22px 30px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    gap: 10px;
-  }
-  header { display: flex; justify-content: space-between; align-items: center; min-height: 40px; }
-  header img { height: 40px; width: auto; display: block; opacity: 0.92; }
-  .script { font-size: 20px; white-space: nowrap; }
-  .script b { color: #FFFFFF; font-weight: 700; letter-spacing: 0.04em; }
-  .script .sep { margin: 0 10px; color: rgba(245,236,215,0.45); }
-  .script .lang { color: rgba(245,236,215,0.75); }
-
-  .marina { display: flex; align-items: flex-end; gap: 12px; }
-  .marina img { width: 150px; height: auto; display: block; flex: none; }
-  .marina p { margin: 0 0 12px; flex: 1; padding: 12px 16px; border: 2px solid #C5E3A1; border-radius: 20px 20px 20px 4px; }
-  .marina .hi { display: block; font-family: Caveat, Figtree, cursive; font-size: 38px; font-weight: 700; line-height: 1; color: #C5E3A1; }
-  .marina .say { display: block; font-size: 21px; line-height: 1.3; margin-top: 4px; white-space: nowrap; }
-
-  .pick { display: flex; align-items: center; gap: 8px; }
-  .pick .text { flex: 1; text-align: center; }
-  #phrase { font-size: 52px; font-weight: 700; line-height: 1.05; color: #FFFFFF; text-transform: uppercase; letter-spacing: 0.03em; }
-  #english { margin-top: 8px; font-size: 26px; color: rgba(245,236,215,0.75); }
-  #dots { display: flex; justify-content: center; gap: 8px; margin-top: 14px; }
-  #dots span { width: 10px; height: 10px; border-radius: 5px; border: 2px solid rgba(245,236,215,0.4); }
-  #dots span.on { background: #C5E3A1; border-color: #C5E3A1; }
-  .step {
-    flex: none; width: 48px; min-height: 88px;
-    font: 44px Figtree, system-ui, sans-serif; color: rgba(245,236,215,0.5);
-    background: transparent; border: 0; cursor: pointer;
-  }
-
-  /* Key legend: uniform keys; gold flashes on the key just pressed. */
-  .bottom { display: flex; justify-content: center; align-items: flex-start; gap: 14px; }
-  .key, #start { min-width: 96px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-  .key .cap, #start .cap {
-    width: 64px; height: 40px; border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 22px; color: var(--ink); border: 2px solid rgba(245,236,215,0.5);
-    transition: border-color 0.15s, color 0.15s, box-shadow 0.15s;
-  }
-  #start .cap { font-size: 17px; font-weight: 700; }
-  .key .lbl, #start .lbl { font-size: 18px; color: rgba(245,236,215,0.8); white-space: nowrap; transition: color 0.15s; }
-  #start { background: transparent; border: 0; padding: 0; margin: 0; font: inherit; cursor: pointer; }
-  #start:focus, #start:focus-visible { outline: none; }
-  .key.pressed .cap, #start.pressed .cap { border-color: #F6C85C; color: #F6C85C; box-shadow: 0 0 0 3px rgba(246,200,92,0.28); }
-  .key.pressed .lbl, #start.pressed .lbl { color: #F6C85C; }
-
-  .talk { position: fixed; right: 12px; bottom: 8px; font: 13px Figtree, system-ui, sans-serif; opacity: 0.45; }
-  .talk a { color: var(--ink); }
-  @media (max-height: 560px) { #phrase { font-size: 42px; } #english { font-size: 22px; } .marina img { width: 112px; } }
+  .hero { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: -26px; text-align: center; }
+  .hero img { width: 196px; height: auto; display: block; }
+  .hero .sub { margin: 4px 0 0; font-size: 19px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; }
+  .hero .tag2 { margin: 6px 0 0; font-size: 16px; color: var(--quiet); }
+  .scripts { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
+  .scripts .lab { font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .scripts .row { display: flex; gap: 6px; flex-wrap: nowrap; }
+  .more { text-align: center; font-size: 14px; color: var(--muted); }
 </style>
 </head>
 <body>
-<main>
-  <header>
-    <img src="img/wordmark-cream.png" alt="Sulat">
-    <span class="script"><b>BAYBAYIN</b><span class="sep">|</span><span class="lang">Tagalog</span></span>
-  </header>
+<div class="page">
+  <div class="bar" style="justify-content: flex-end">
+    <button type="button" class="iconbtn" id="sound" aria-pressed="false" aria-label="Sound on. Tap to turn off"><svg class="on" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"></path><path d="M16.5 8.5a5 5 0 0 1 0 7"></path><path d="M19 6a8.5 8.5 0 0 1 0 12"></path></svg><svg class="off" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"></path><path d="M17 9l5 6M22 9l-5 6"></path></svg></button>
+  </div>
+
+  <div class="hero">
+    <img src="img/wordmark-green.png" alt="Sulat">
+    <p class="sub">Handwriting Tutor</p>
+    <p class="tag2">Practice the scripts the world stopped teaching.</p>
+  </div>
 
   <div class="marina">
-    <img src="img/marina-lens.webp" alt="Marina, your teacher">
-    <p><span class="hi">Kumusta!</span><span class="say">Pick a phrase to learn.</span></p>
-  </div>
-
-  <div class="pick">
-    <button class="step" id="prev" type="button" tabindex="-1" aria-label="Previous phrase">&#8249;</button>
-    <div class="text" aria-live="polite">
-      <div id="phrase"></div>
-      <div id="english"></div>
-      <div id="dots" aria-hidden="true"></div>
+    <img src="img/marina.webp" alt="Marina, your teacher">
+    <div class="bubble">
+      <p class="hi">Kumusta! I’m Marina.</p>
+      <p class="say">How would you like to practice today?</p>
     </div>
-    <button class="step" id="next" type="button" tabindex="-1" aria-label="Next phrase">&#8250;</button>
   </div>
 
-  <div class="bottom">
-    <div class="key" id="keyPrev"><span class="cap">&#8592;</span><span class="lbl">Prev</span></div>
-    <button id="start" type="button"><span class="cap">Enter</span><span class="lbl">Start</span></button>
-    <div class="key" id="keyNext"><span class="cap">&#8594;</span><span class="lbl">Next</span></div>
-  </div>
-</main>
-<div class="talk"><a href="talk.html">Talk to Sulat</a> · <a href="hello.html">Input test</a></div>
+  <a class="card bamboo" href="animate.html">
+    <span class="badge"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"></rect><path d="M11 18.5h2"></path></svg></span>
+    <span><span class="title">On my phone</span><span class="desc">Watch it written, trace it, snap your paper for Marina, or talk it through.</span></span>
+  </a>
 
+  <a class="card bamboo" href="glasses-setup.html">
+    <span class="badge"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 9h19"></path><path d="M4 9v3.5a3.5 3.5 0 0 0 7 0V9"></path><path d="M13 9v3.5a3.5 3.5 0 0 0 7 0V9"></path></svg></span>
+    <span><span class="title">With Display glasses</span><span class="desc">Lessons in your lens. Your phone’s camera captures your work to share with Marina.</span><span class="tag">Meta Ray-Ban Display</span></span>
+  </a>
+
+  <div class="more">Also on the phone: <a href="practice.html">Practice</a> · <a href="talk.html">Talk to Sulat</a></div>
+
+  <div class="scripts">
+    <span class="lab">Script</span>
+    <div class="row">
+      <span class="pill on" aria-current="true">Baybayin</span>
+      <span class="pill soon">Cursive · soon</span>
+      <span class="pill soon">Calligraphy · soon</span>
+    </div>
+  </div>
+</div>
 <script>
 (function () {
   'use strict';
 
-  var PHRASES = [
-    { text: 'mahal kita', en: 'I love you' },
-    { text: 'salamat', en: 'thank you' },
-    { text: 'kumusta', en: 'how are you' },
-    { text: 'magandang umaga', en: 'good morning' },
-    { text: 'paalam', en: 'goodbye' }
-  ];
-
-  var i = 0;
-  var $ = function (id) { return document.getElementById(id); };
-
-  function go(url) {
-    if (window.__sulatNav) { window.__sulatNav(url); } else { window.location.replace(url); }
-  }
-
-  function show() {
-    i = (i + PHRASES.length) % PHRASES.length;
-    $('phrase').textContent = PHRASES[i].text;
-    $('phrase').style.fontSize = PHRASES[i].text.length > 10 ? '40px' : ''; // long phrases stay on one line
-    $('english').textContent = PHRASES[i].en;
-    $('dots').innerHTML = PHRASES.map(function (p, k) { return '<span' + (k === i ? ' class="on"' : '') + '></span>'; }).join('');
-  }
-
-  function start() {
-    go('animate.html?view=glasses&text=' + encodeURIComponent(PHRASES[i].text));
-  }
-
-  // Gold flashes on the key just pressed.
-  function flash(id) {
-    var el = $(id);
-    if (!el) { return; }
-    el.classList.add('pressed');
-    clearTimeout(el.__flash);
-    el.__flash = setTimeout(function () { el.classList.remove('pressed'); }, 320);
-  }
-
-  // The Neural Band arrives as arrow keys, and Select as a click on the focused button.
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); flash('keyNext'); i += 1; show(); }
-    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); flash('keyPrev'); i -= 1; show(); }
-    else if (e.key === 'Enter' || e.key === ' ') {
-      flash('start');
-      if (e.target !== $('start')) { e.preventDefault(); start(); }
-    }
-  });
-  $('prev').addEventListener('click', function () { i -= 1; show(); });
-  $('next').addEventListener('click', function () { i += 1; show(); });
-  $('start').addEventListener('click', start);
-
-  show();
-  $('start').focus();
+  // Sound on/off, remembered on this device (default on). Pages that play audio check the same key.
+  var soundBtn = document.getElementById('sound');
+  function soundIsOff() { try { return window.localStorage.getItem('sulat.sound') === 'off'; } catch (e) { return false; } }
+  function paintSound() { var off = soundIsOff(); soundBtn.setAttribute('aria-pressed', off ? 'true' : 'false'); soundBtn.setAttribute('aria-label', off ? 'Sound off. Tap to turn on' : 'Sound on. Tap to turn off'); }
+  soundBtn.addEventListener('click', function () { try { window.localStorage.setItem('sulat.sound', soundIsOff() ? 'on' : 'off'); } catch (e) { /* private mode */ } paintSound(); });
+  paintSound();
 })();
 </script>
 </body>
