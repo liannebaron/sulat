@@ -4,124 +4,162 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Sulat · Paper check</title>
+<title>Sulat · Write it on paper</title>
+<link rel="icon" href="img/favicon.png">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<link rel="stylesheet" href="phone.css">
 <style>
-  :root {
-    --page: #eceff3;
-    --card: #ffffff;
-    --ink: #14161a;
-    --quiet: #5d6572;
-    --line: #d9dde3;
-    --accent: #1f3a8a;
-    --good: #1f7a4d;
-    --warn: #9a3b12;
-  }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; overscroll-behavior: none; }
-  body {
-    background: var(--page);
-    color: var(--ink);
-    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  }
-  .wrap {
-    max-width: 640px;
-    margin: 0 auto;
-    padding: 16px;
-    padding-left: max(16px, env(safe-area-inset-left));
-    padding-right: max(16px, env(safe-area-inset-right));
-    padding-bottom: max(24px, env(safe-area-inset-bottom));
-  }
-  h1 { margin: 4px 0 2px; font: 400 30px Georgia, "Times New Roman", serif; }
-  h2 { margin: 0 0 8px; font: 400 24px Georgia, "Times New Roman", serif; }
-  .lede { margin: 0 0 16px; color: var(--quiet); }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
-  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 4px; }
-  .chips button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--accent); border-color: var(--accent); }
-  button, .filebtn {
-    font: inherit;
-    min-height: 48px;
-    padding: 0 18px;
-    border-radius: 10px;
-    border: 1px solid var(--line);
-    background: #fff;
-    color: var(--ink);
-    cursor: pointer;
-    touch-action: manipulation;
-    display: inline-flex;
-    align-items: center;
-  }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
-  button:disabled { opacity: 0.45; cursor: default; }
-  button:focus-visible, input:focus-visible, .filebtn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-  input[type="text"] { min-height: 44px; padding: 0 12px; font: inherit; border: 1px solid var(--line); border-radius: 10px; width: 100%; max-width: 280px; }
-  label.field { display: block; margin: 14px 0 6px; color: var(--quiet); }
-  .tip { margin: 0 0 10px; color: var(--quiet); }
-  #status { min-height: 1.4em; margin: 10px 0 0; color: var(--quiet); }
-  #status.error { color: var(--warn); }
-  #deskStatus { min-height: 1.4em; margin: 10px 0 0; color: var(--quiet); }
-  #deskStatus.error { color: var(--warn); }
-  #preview { display: block; width: 100%; max-width: 320px; height: auto; margin-top: 12px; border: 1px solid var(--line); border-radius: 10px; background: #000; }
-  #deskTarget { font: 400 30px Georgia, "Times New Roman", serif; margin: 0 0 8px; }
-  .compare { display: flex; gap: 12px; margin-top: 12px; }
-  .compare figure { flex: 1 1 0; min-width: 0; max-width: 180px; margin: 0; }
-  .compare figcaption { margin-top: 6px; color: var(--quiet); font-size: 14px; }
-  .compare .slot { width: 100%; aspect-ratio: 1 / 1; background: #fff; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-  .compare .slot img { display: block; width: 100%; height: 100%; object-fit: contain; }
-  #verdict { margin: 0 0 6px; font: 400 26px Georgia, "Times New Roman", serif; }
-  #verdict.good { color: var(--good); }
-  #tips { margin: 6px 0 0; padding-left: 20px; }
-  #tips li { margin-bottom: 4px; }
-  #timings { margin: 12px 0 0; color: var(--quiet); font-size: 14px; }
+  /* Paper: write on real paper, then Marina checks it. Two modes on one page:
+     photo (this phone takes the picture) and desk (this phone is the camera for the glasses).
+     Look only; the camera, room and checking code are unchanged. */
+  html, body { overscroll-behavior: none; }
   [hidden] { display: none !important; }
+  .paper { gap: 12px; }
+  .barR { display: flex; align-items: center; gap: 8px; }
+  .backbtn { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 16px 0 10px; border-radius: 999px; background: var(--cream); border: 1.5px solid var(--tan); color: var(--leaf); font: 600 15px Figtree, sans-serif; cursor: pointer; touch-action: manipulation; }
+  .modes { display: flex; padding: 3px; border-radius: 999px; background: #F3EBD8; border: 1.5px solid var(--tan); align-self: center; }
+  .modes a { min-height: 40px; padding: 0 16px; border-radius: 999px; display: flex; align-items: center; color: var(--quiet); font: 600 15px Figtree, sans-serif; text-decoration: none; white-space: nowrap; }
+  .modes a[aria-current="true"] { background: var(--leaf); color: var(--cream); }
+  .marina img { width: 84px; }
+  .bubble .hi { font-size: 28px; }
+  .bubble .say { white-space: nowrap; font-size: 15px; margin-top: 6px; }
+  .bubble .say span { display: block; }
+  body.desk .only-photo, body:not(.desk) .only-desk { display: none !important; }
+  /* the two cards change places by mode */
+  .paper > .marina { order: 1; }
+  #compareCard { order: 2; }
+  #photoCard { order: 3; }
+  #deskCard { order: 3; }
+  #result { order: 4; }
+  body.desk #deskCard { order: 2; }
+  body.desk #result { order: 3; }
+  body.desk #compareCard { order: 4; }
+  .panel { padding: 14px 16px; background-color: var(--cream); border: 1.5px solid var(--tan); border-radius: 18px; box-shadow: 0 3px 0 var(--tan), 0 12px 20px -14px rgba(91,70,30,0.45); display: flex; flex-direction: column; gap: 10px; }
+  .lab { font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  /* photo mode */
+  .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+  .chips button { min-height: 44px; min-width: 52px; padding: 0 14px; border: 1.5px solid var(--tan); border-radius: 14px; background: var(--cream); color: var(--ink); font: 600 17px Figtree, sans-serif; box-shadow: 0 3px 0 var(--tan); cursor: pointer; touch-action: manipulation; }
+  .chips button[aria-pressed="true"] { background: var(--leaf); border-color: var(--leaf); color: var(--cream); box-shadow: 0 3px 0 var(--leaf-dark); }
+  .typeone { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; color: var(--muted); }
+  .typeone input { width: 96px; min-height: 40px; padding: 0 10px; font: 600 16px Figtree, sans-serif; color: var(--ink); background: #FFFFFF; border: 1.5px solid var(--tan); border-radius: 10px; }
+  .linkbtn { min-height: 40px; border: 0; background: transparent; color: var(--leaf); font: 600 14px Figtree, sans-serif; text-decoration: underline; cursor: pointer; padding: 0 4px; }
+  .tip { margin: 0; text-align: center; font-size: 14px; color: var(--quiet); }
+  .twin { display: flex; gap: 8px; }
+  .twin > * { flex: 1; min-width: 0; }
+  .filebtn { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 54px; border-radius: 14px; border: 1.5px solid var(--leaf); background: #FFFFFF; color: var(--leaf); font: 700 16px Figtree, sans-serif; cursor: pointer; touch-action: manipulation; white-space: nowrap; }
+  .go { min-height: 54px; border-radius: 14px; border: 0; background: var(--leaf); color: var(--cream); font: 700 16px Figtree, sans-serif; box-shadow: 0 4px 0 var(--leaf-dark); cursor: pointer; touch-action: manipulation; white-space: nowrap; }
+  .go:disabled { opacity: 0.5; }
+  /* desk mode */
+  .codein { width: 100%; min-height: 72px; padding: 0 16px; text-align: center; font: 700 44px Figtree, sans-serif; letter-spacing: 0.35em; color: var(--ink); background: #FFFFFF; border: 2px solid var(--leaf); border-radius: 16px; box-shadow: 0 3px 0 var(--leaf); }
+  .codein::placeholder { color: #CDBF9F; letter-spacing: 0.35em; }
+  #deskTarget { font-size: 22px; font-weight: 700; color: var(--leaf); text-align: center; }
+  .bezel { padding: 16px; border-radius: 26px; background: linear-gradient(180deg, #3C6E44 0%, #2B5232 100%); box-shadow: inset 0 2px 0 rgba(255,255,255,0.28), inset 0 -3px 0 rgba(0,0,0,0.22), 0 6px 0 #1E3D24, 0 18px 24px -16px rgba(30,61,36,0.6); }
+  .bezel .lcd { padding: 6px; border-radius: 16px; background: #0E130E; box-shadow: inset 0 4px 8px rgba(0,0,0,0.75); }
+  #preview { display: block; width: 100%; height: auto; max-height: 46vh; object-fit: contain; border-radius: 11px; background: #000; }
+  .onglasses { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 14px; background: #F3EBD8; font-size: 15px; line-height: 1.35; }
+  .onglasses .k { flex: none; height: 34px; padding: 0 10px; border: 2px solid var(--leaf); border-radius: 9px; display: flex; align-items: center; font-size: 14px; font-weight: 700; color: var(--leaf); }
+  #deskStatus, #status { margin: 0; min-height: 1.3em; text-align: center; font-size: 14px; color: var(--muted); }
+  #deskStatus.error, #status.error { color: #A8402E; }
+  /* Marina's answer */
+  #result { display: flex; align-items: flex-end; gap: 6px; }
+  #result > img { width: 72px; height: auto; display: block; flex: none; }
+  #result .bubble { margin-bottom: 8px; }
+  #verdict { margin: 0; font-family: Caveat, cursive; font-size: 32px; font-weight: 700; line-height: 1; color: var(--leaf); }
+  #verdict.good { color: #2A7A3B; }
+  #verdict.almost { color: #8A5E0E; }
+  #verdict.retry { color: #A8402E; }
+  #tips { margin: 6px 0 0; padding: 0; list-style: none; font-size: 15px; line-height: 1.35; }
+  #tips li { margin: 3px 0; }
+  #timings { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+  #timings:empty { display: none; }
+  /* your script and Marina's, side by side */
+  .compare { display: flex; gap: 12px; }
+  .compare figure { flex: 1 1 0; min-width: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+  .compare .slot { width: 100%; aspect-ratio: 1 / 1; background: #FFFFFF; border: 1.5px solid var(--tan); border-radius: 14px; box-shadow: 0 3px 0 var(--tan); overflow: hidden; display: flex; align-items: center; justify-content: center; }
+  .compare .slot img { display: block; width: 100%; height: 100%; object-fit: contain; }
+  .compare figcaption { font-size: 14px; font-weight: 600; color: var(--quiet); text-align: center; }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Paper check</h1>
-  <p class="lede">Write one Baybayin syllable on paper, photograph it, and Sulat tells you what to fix.</p>
+<script>
+  // Desk mode when the glasses sent you here (?mode=desk or a room code); otherwise photo mode. Set before paint.
+  (function () {
+    var q = new URLSearchParams(window.location.search);
+    if (q.get('mode') === 'desk' || q.get('room')) { document.body.className = 'desk'; }
+  })();
+</script>
+<div class="page paper">
+  <div class="bar">
+    <a href="index.html?view=phone" aria-label="Sulat home"><img src="img/wordmark-green.png" alt="Sulat"></a>
+    <div class="barR">
+      <button type="button" class="backbtn" id="topBack"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>Back</button>
+    </div>
+  </div>
 
-  <section class="card" id="photoCard">
-    <label class="field" for="syl">Or type any syllable</label>
-    <input id="syl" type="text" value="ma" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="8">
+  <nav class="modes" aria-label="Which camera">
+    <a id="modePhoto" href="paper.html">Photo</a>
+    <a id="modeDesk" href="paper.html?mode=desk">Glasses desk camera</a>
+  </nav>
+
+  <div class="marina only-photo">
+    <img src="img/marina.webp" alt="Marina">
+    <div class="bubble">
+      <p class="hi">Now you write it!</p>
+      <p class="say"><span>Dark pen, write big,</span><span>and fill the frame.</span></p>
+    </div>
+  </div>
+  <div class="marina only-desk">
+    <img src="img/marina.webp" alt="Marina">
+    <div class="bubble">
+      <p class="hi">Lend me your eyes!</p>
+      <p class="say"><span>Type the code from your glasses,</span><span>then stand me over your paper.</span></p>
+    </div>
+  </div>
+
+  <section class="panel only-photo" id="photoCard">
+    <span class="lab">Pick a letter</span>
     <div class="chips" id="chips"></div>
-    <button id="moreLetters" type="button">More letters</button>
-    <p class="tip">Use a dark pen, write big, and fill the frame.</p>
-    <div class="row">
+    <div class="typeone">
+      <label for="syl">or type one</label>
+      <input id="syl" type="text" value="ma" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="8">
+      <button id="moreLetters" type="button" class="linkbtn">More letters</button>
+    </div>
+    <p class="tip">Write it on paper, then take a photo.</p>
+    <div class="twin">
       <label class="filebtn" id="photoLabel" for="photo">Take a photo</label>
       <input id="photo" type="file" accept="image/*" capture="environment" hidden>
-      <button id="check" type="button" class="primary">Check my writing</button>
+      <button id="check" type="button" class="go">Check my writing</button>
     </div>
   </section>
 
-  <section class="card">
-    <h2>Desk camera</h2>
+  <section class="panel only-desk" id="deskCard">
     <div id="deskTarget" hidden></div>
-    <p class="tip">Put this phone on a stand above the paper, facing down at your writing. The glasses will ask it to check.</p>
-    <label class="field" for="room">Room code (shown in the glasses)</label>
-    <input id="room" type="text" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="8" placeholder="e.g. 4821">
-    <div class="row" style="margin-top:14px">
-      <button id="desk" type="button">Use as desk camera</button>
-    </div>
-    <video id="preview" playsinline muted hidden></video>
+    <label class="lab" for="room">Code from your glasses</label>
+    <input id="room" class="codein" type="text" inputmode="numeric" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="8" placeholder="0000">
+    <button id="desk" type="button" class="go">Pair and turn on camera</button>
+    <div class="bezel" id="bezel" hidden><div class="lcd"><video id="preview" playsinline muted hidden></video></div></div>
     <p id="deskStatus" role="status" aria-live="polite"></p>
+    <div class="onglasses"><span class="k">Enter</span><span>On your glasses, choose <b>Check my work</b> and I’ll begin.</span></div>
   </section>
 
-  <section class="card" id="result" hidden>
-    <h2 id="verdict"></h2>
-    <ul id="tips"></ul>
-    <p id="timings"></p>
+  <section id="result" hidden>
+    <img src="img/marina.webp" alt="">
+    <div class="bubble">
+      <h2 id="verdict"></h2>
+      <ul id="tips"></ul>
+      <p id="timings"></p>
+    </div>
   </section>
 
-  <section class="card">
+  <section class="panel" id="compareCard">
     <div class="compare">
       <figure>
         <div class="slot"><img id="seen" alt="Cleaned photo of your handwriting" hidden></div>
-        <figcaption id="seenCap">Your photo</figcaption>
+        <figcaption id="seenCap">Your script</figcaption>
       </figure>
       <figure id="refWrap" hidden>
-        <div class="slot"><img id="ref" alt="Reference glyph"></div>
-        <figcaption id="refCap">Reference</figcaption>
+        <div class="slot"><img id="ref" alt="Marina’s script"></div>
+        <figcaption id="refCap">Marina’s script</figcaption>
       </figure>
     </div>
     <p id="status" role="status" aria-live="polite"></p>
@@ -187,7 +225,7 @@
     cleaned = null;
     seen.hidden = true;
     seen.removeAttribute('src');
-    seenCap.textContent = 'Your photo';
+    seenCap.textContent = 'Your script';
     result.hidden = true;
     if (!f) { return; }
     say('Cleaning up your photo…');
@@ -211,7 +249,7 @@
     cleaned = out;
     seen.src = out.dataURL;
     seen.hidden = false;
-    seenCap.textContent = 'What Sulat sees';
+    seenCap.textContent = 'Your script';
     photoLabel.textContent = 'Retake photo';
     say('Ready. Press “Check my writing”.');
   }
@@ -231,7 +269,7 @@
       refImg.src = url;
       refImg.hidden = false;
       refWrap.hidden = false;
-      refCap.textContent = 'Reference';
+      refCap.textContent = 'Marina’s script';
     }).catch(function () {
       refWrap.hidden = true;
       refCache = null;
@@ -300,19 +338,21 @@
     verdictEl.className = '';
     tipsEl.innerHTML = '';
     if (found.verdict === 'good') {
-      verdictEl.textContent = 'Looks right!';
+      verdictEl.textContent = 'Magaling!';
       verdictEl.className = 'good';
     } else if (found.verdict === 'almost') {
-      verdictEl.textContent = 'Almost there';
+      verdictEl.textContent = 'Almost!';
+      verdictEl.className = 'almost';
     } else {
       verdictEl.textContent = 'Try again';
+      verdictEl.className = 'retry';
     }
     (found.tips || []).forEach(function (t) {
       var li = document.createElement('li');
       li.textContent = t;
       tipsEl.appendChild(li);
     });
-    timingsEl.textContent = found.ms != null ? 'Feedback in ' + found.ms + ' ms' : '';
+    timingsEl.textContent = found.ms != null ? 'Marina answered in ' + (found.ms / 1000).toFixed(1) + ' s' : '';
     say('');
     try { result.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
     catch (e) { if (result.scrollIntoView) { result.scrollIntoView(); } }
@@ -340,7 +380,7 @@
         refImg.src = refURL;
         refImg.hidden = false;
         refWrap.hidden = false;
-        refCap.textContent = 'Reference';
+        refCap.textContent = 'Marina’s script';
         return refURL;
       });
     refP.then(function (refURL) {
@@ -394,14 +434,15 @@
     if (desk.lock) { try { desk.lock.release(); } catch (e) { /* already released */ } desk.lock = null; }
     preview.hidden = true;
     try { preview.srcObject = null; } catch (e) { /* older browser */ }
-    deskBtn.textContent = 'Use as desk camera';
+    deskBtn.textContent = 'Pair and turn on camera';
+    $('bezel').hidden = true;
     desk.lastCmd = null;
     desk.skipFirst = false;
-    photoCard.hidden = false;
+    photoCard.hidden = document.body.classList.contains('desk'); // desk page keeps the photo controls away
     deskTarget.hidden = true;
     seen.hidden = true;
     try { seen.removeAttribute('src'); } catch (e) { /* older browser */ }
-    seenCap.textContent = 'Your photo';
+    seenCap.textContent = 'Your script';
     cleaned = null;
     result.hidden = true;
     verdictEl.textContent = '';
@@ -425,6 +466,7 @@
       desk.stream = s;
       preview.srcObject = s;
       preview.hidden = false;
+      $('bezel').hidden = false;
       var played = null;
       try { played = preview.play(); } catch (e) { played = null; }
       return (played && played.catch) ? played.catch(function () {}) : null;
@@ -432,7 +474,7 @@
       desk.on = true;
       desk.lastCmd = null;
       desk.skipFirst = true;
-      deskBtn.textContent = 'Stop desk camera';
+      deskBtn.textContent = 'Stop camera';
       photoCard.hidden = true;
       result.hidden = true;
       verdictEl.textContent = '';
@@ -506,7 +548,7 @@
     deskTarget.hidden = false;
     refWrap.hidden = false;
     refImg.hidden = true;
-    refCap.textContent = 'Reference: ' + cmd.target;
+    refCap.textContent = 'Marina’s ' + cmd.target;
     result.hidden = false;
     verdictEl.textContent = 'Checking your writing…';
     tipsEl.innerHTML = '';
@@ -523,7 +565,7 @@
     if (!cameraLive()) {
       stopDesk(true);
       answerCommand(code, cmd, 'retry', [RETRY_TIP], Date.now() - t0);
-      dsay('The phone camera stopped. Tap Use as desk camera again.', true);
+      dsay('The phone camera stopped. Tap Pair and turn on camera again.', true);
       desk.working = false;
       return;
     }
@@ -540,7 +582,7 @@
     }
     seen.src = cleaned.dataURL;
     seen.hidden = false;
-    seenCap.textContent = 'What Sulat sees';
+    seenCap.textContent = 'Your script';
     renderReference(cmd.target).then(function (refURL) {
       refImg.src = refURL;
       refImg.hidden = false;
@@ -605,6 +647,20 @@
     moreBtn.textContent = moreMode ? 'Fewer letters' : 'More letters';
   });
   sylInput.addEventListener('change', onSyllableChanged);
+
+  (function () {
+    var desk = document.body.classList.contains('desk');
+    var q = new URLSearchParams(window.location.search);
+    var text = q.get('text');
+    $('modePhoto').setAttribute('aria-current', desk ? 'false' : 'true');
+    $('modeDesk').setAttribute('aria-current', desk ? 'true' : 'false');
+    if (text) { $('modePhoto').href = 'paper.html?text=' + encodeURIComponent(text); }
+    if (desk) { photoCard.hidden = true; } else { $('deskCard').hidden = true; }
+    Array.prototype.forEach.call(document.querySelectorAll(desk ? '.only-photo' : '.only-desk'), function (el) { el.hidden = true; });
+    $('topBack').addEventListener('click', function () {
+      if (window.history.length > 1) { window.history.back(); } else { window.location.href = 'index.html?view=phone'; }
+    });
+  })();
 
   Sulat.loadPack('packs/baybayin.json').then(function (p) {
     pack = p;

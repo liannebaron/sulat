@@ -770,6 +770,7 @@
     var n = st.results.length, first = firstTryCount();
     var all = st.results.every(function (r) { return r.tryPassed; });
     $('doneHead').textContent = all ? 'Magaling!' : 'Nice work!';
+    $('paperBtn').href = 'paper.html?text=' + encodeURIComponent(st.text);
     $('doneTitle').textContent = all ? 'You wrote “' + st.text + '” from memory!' : 'Lesson complete';
     var got = st.results.filter(function (r) { return r.tryPassed; }).length;
     $('summary').textContent = 'First try from memory: ' + first + ' of ' + n + ' · got there in the end: ' + got + ' of ' + n;
