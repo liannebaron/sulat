@@ -4,158 +4,174 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Sulat · Practice</title>
+<link rel="icon" href="img/favicon.png">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<link rel="stylesheet" href="phone.css">
 <style>
-  :root {
-    --page: #eceff3;
-    --card: #ffffff;
-    --ink: #14161a;
-    --quiet: #5d6572;
-    --line: #d9dde3;
-    --accent: #1f3a8a;
-    --good: #1f7a4d;
-    --warn: #9a3b12;
-  }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; overscroll-behavior: none; }
-  body {
-    background: var(--page);
-    color: var(--ink);
-    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  }
-  .wrap {
-    max-width: 640px;
-    margin: 0 auto;
-    padding: 16px;
-    padding-left: max(16px, env(safe-area-inset-left));
-    padding-right: max(16px, env(safe-area-inset-right));
-    padding-bottom: max(24px, env(safe-area-inset-bottom));
-  }
-  h1 { margin: 4px 0 2px; font: 400 30px Georgia, "Times New Roman", serif; }
-  h2 { margin: 0 0 8px; font: 400 24px Georgia, "Times New Roman", serif; }
-  .lede { margin: 0 0 16px; color: var(--quiet); }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
-  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-  .between { justify-content: space-between; }
-  button {
-    font: inherit;
-    min-height: 48px;
-    padding: 0 18px;
-    border-radius: 10px;
-    border: 1px solid var(--line);
-    background: #fff;
-    color: var(--ink);
-    cursor: pointer;
-    touch-action: manipulation;
-  }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
-  button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--accent); border-color: var(--accent); }
-  button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-  input[type="text"] { min-height: 44px; padding: 0 12px; font: inherit; border: 1px solid var(--line); border-radius: 10px; width: 100%; max-width: 280px; }
-  label.field { display: block; margin: 14px 0 6px; color: var(--quiet); }
-  #phraseView svg { display: block; width: 100%; height: auto; max-height: 190px; color: var(--ink); }
-  #phraseView .label { fill: var(--quiet); }
-  #phraseLine { font: 22px Georgia, "Times New Roman", serif; margin: 10px 0 4px; }
-  #sylList { margin: 6px 0 0; padding-left: 20px; color: var(--quiet); }
-  #where { color: var(--quiet); }
-  #phaseName { font-weight: 600; color: var(--accent); }
-  #cue { text-align: center; margin: 6px 0 10px; }
-  #cueBig { font: 56px Georgia, "Times New Roman", serif; line-height: 1.1; }
-  #cueSmall { color: var(--quiet); margin-top: 4px; min-height: 1.4em; }
-  .stagebox {
-    position: relative;
-    width: 100%;
-    max-width: 520px;
-    margin: 0 auto;
-    aspect-ratio: 1 / 1;
-    background: #fff;
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    overflow: hidden;
-  }
-  #show { position: absolute; inset: 0; pointer-events: none; color: var(--ink); }
-  #show svg { display: block; width: 100%; height: 100%; }
-  #pad {
-    position: absolute; inset: 0; width: 100%; height: 100%;
-    touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
-  }
-  #feedback { min-height: 1.5em; margin: 12px 0 2px; font-size: 18px; text-align: center; }
-  #feedback.good { color: var(--good); font-weight: 600; }
-  #feedback.bad { color: var(--warn); }
-  #tip { min-height: 1.3em; margin: 0 0 10px; color: var(--quiet); text-align: center; }
-  #actions { justify-content: center; }
-  table { width: 100%; border-collapse: collapse; margin: 8px 0 12px; }
-  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); }
-  th { color: var(--quiet); font-weight: 500; }
-  .ok { color: var(--good); }
-  .no { color: var(--warn); }
+  /* Practice: the shared phone look (phone.css) plus the lesson pieces. Drawing, scoring and flow are unchanged. */
+  html, body { overscroll-behavior: none; }
   /* Pencil taps and quick marks must never select page text (found in the family study). */
   body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
   input, #copyStatus { -webkit-user-select: text; user-select: text; }
-  #startBtn { min-height: 56px; padding: 0 28px; font-size: 18px; }
-  #howTitle { margin: 16px 0 0; font-weight: 600; }
-  #howItWorks { margin: 6px 0 0; padding-left: 22px; }
-  #howItWorks li { margin: 4px 0; }
-  #howTip { margin: 8px 0 0; color: var(--quiet); }
   [hidden] { display: none !important; }
+  .prac section { display: flex; flex-direction: column; gap: 12px; }
+  .marina img { width: 80px; }
+  .bubble { padding: 10px 16px; }
+  .bubble .hi { font-size: 30px; }
+  .bubble .hi.good { color: #2A7A3B; }
+  .bubble .hi.almost { color: #8A5E0E; }
+  .bubble .hi.retry { color: #A8402E; }
+  .bubble .say { margin: 5px 0 0; font-size: 15px; line-height: 1.3; text-wrap: balance; min-height: 0; }
+  .bubble .say:empty { display: none; }
+  .bubble .say2 { margin: 3px 0 0; font-size: 14px; line-height: 1.3; color: var(--quiet); text-wrap: balance; }
+  .bubble .say2:empty { display: none; }
+  .backrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .backbtn { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 16px 0 10px; box-sizing: border-box; border-radius: 999px; background: var(--cream); border: 1.5px solid var(--tan); color: var(--leaf); font: 600 15px Figtree, sans-serif; text-decoration: none; cursor: pointer; touch-action: manipulation; }
+  #where { font-size: 14px; color: var(--muted); white-space: nowrap; }
+  /* start */
+  #phrases { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+  #phrases button { min-height: 44px; padding: 0 16px; border: 1.5px solid var(--tan); border-radius: 999px; background: var(--cream); color: var(--ink); font: 600 15px Figtree, sans-serif; white-space: nowrap; box-shadow: 0 3px 0 var(--tan); cursor: pointer; touch-action: manipulation; }
+  #phrases button[aria-pressed="true"] { background: var(--leaf); border-color: var(--leaf); color: var(--cream); box-shadow: 0 3px 0 var(--leaf-dark); }
+  .panel { padding: 14px 16px 12px; background-color: var(--cream); border: 1.5px solid var(--tan); border-radius: 18px; box-shadow: 0 3px 0 var(--tan), 0 12px 20px -14px rgba(91,70,30,0.45); }
+  #phraseView svg { display: block; width: 100%; height: auto; max-height: 190px; color: var(--ink); }
+  #phraseView .label { fill: var(--muted); font-family: Figtree, system-ui, sans-serif; font-weight: 600; }
+  #phraseLine { margin: 8px 0 0; font-size: 20px; font-weight: 700; }
+  .steps3 { display: flex; gap: 8px; }
+  .steps3 div { flex: 1; display: flex; align-items: center; gap: 8px; padding: 10px; background: var(--cream); border: 1.5px solid var(--tan); border-radius: 14px; font-size: 14px; font-weight: 600; white-space: nowrap; }
+  .steps3 span { width: 24px; height: 24px; border-radius: 12px; background: var(--leaf); color: var(--cream); font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex: none; }
+  .peekhint { margin: 0; text-align: center; font-size: 14px; color: var(--muted); }
+  #introStatus { margin: 0; color: var(--muted); font-size: 14px; }
+  #scorerStamp { margin: 0; color: var(--muted); font-size: 11px; text-align: center; opacity: 0.7; }
+  .bigbtn { display: flex; align-items: center; justify-content: center; text-align: center; text-decoration: none; min-height: 58px; border-radius: 16px; border: 0; background: var(--leaf); color: var(--cream); font: 700 18px Figtree, sans-serif; box-shadow: 0 4px 0 var(--leaf-dark); cursor: pointer; touch-action: manipulation; }
+  .bigbtn:disabled { opacity: 0.5; }
+  /* lesson */
+  #progress { display: grid; gap: 6px; }
+  #progress div { display: flex; flex-direction: column; gap: 4px; align-items: center; min-width: 0; }
+  #progress .bar5 { width: 100%; height: 10px; border-radius: 5px; background: #EFE6D2; }
+  #progress .done .bar5 { background: var(--leaf); }
+  #progress .cur .bar5 { background: repeating-linear-gradient(135deg, #E6B43C 0 6px, #F4D88A 6px 12px); }
+  #progress span.t { font-size: 13px; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #progress .cur span.t { color: var(--ink); font-weight: 700; }
+  .labelrow { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  #cue { min-width: 0; }
+  #cueBig { display: block; font-size: 38px; font-weight: 700; line-height: 1; }
+  #cueSmall { display: block; margin-top: 4px; font-size: 13px; line-height: 1.3; color: var(--muted); }
+  #cueSmall:empty { display: none; }
+  #phaseName { flex: none; font-size: 13px; font-weight: 700; border-radius: 999px; padding: 5px 12px; white-space: nowrap; background: var(--sage); color: var(--leaf); }
+  #phaseName.mem { background: #FBEBC0; color: #7A5A0C; }
+  .stagebox { position: relative; width: 100%; max-width: 390px; margin: 0 auto; aspect-ratio: 1 / 1; background: #FFFFFF; border: 1.5px solid var(--tan); border-radius: 18px; box-shadow: 0 3px 0 var(--tan); overflow: hidden; }
+  #show { position: absolute; inset: 0; pointer-events: none; color: var(--ink); }
+  #show svg { display: block; width: 100%; height: 100%; }
+  #pad { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  #actions { display: flex; gap: 8px; }
+  #actions button { flex: 1; min-width: 0; min-height: 52px; padding: 0 8px; border-radius: 14px; border: 1.5px solid var(--tan); background: #FFFFFF; color: var(--leaf); font: 600 15px Figtree, sans-serif; white-space: nowrap; box-shadow: 0 3px 0 var(--tan); cursor: pointer; touch-action: manipulation; }
+  #actions button.primary { flex: 1.3; background: var(--leaf); border-color: var(--leaf); color: var(--cream); font-weight: 700; font-size: 16px; box-shadow: 0 3px 0 var(--leaf-dark); }
+  /* results */
+  #tiles { display: flex; gap: 8px; }
+  #tiles .tile { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 0; background: var(--cream); border: 1.5px solid var(--tan); border-radius: 14px; box-shadow: 0 3px 0 var(--tan); }
+  #tiles .tile b { font-size: 20px; }
+  #summary { margin: 0; text-align: center; font-size: 14px; color: var(--quiet); }
+  .nextcard { display: flex; flex-direction: column; gap: 10px; padding: 16px; background-color: var(--sage); border: 1.5px solid var(--sage-edge); border-radius: 18px; box-shadow: 0 3px 0 var(--sage-edge); }
+  .nextcard .t { display: flex; gap: 12px; align-items: center; font-size: 17px; font-weight: 700; line-height: 1.25; color: var(--leaf); }
+  .nextcard img { width: 44px; height: auto; display: block; flex: none; }
+  details.panel summary { cursor: pointer; font-size: 14px; font-weight: 600; color: var(--quiet); }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 4px; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--tan); }
+  th { color: var(--muted); font-weight: 500; }
+  .ok { color: #2A7A3B; }
+  .no { color: #8A5E0E; }
+  .twin { display: flex; gap: 8px; }
+  .twin button { flex: 1; min-height: 46px; border-radius: 14px; border: 1.5px solid var(--tan); background: #FFFFFF; color: var(--leaf); font: 600 15px Figtree, sans-serif; white-space: nowrap; box-shadow: 0 3px 0 var(--tan); cursor: pointer; }
+  .linkbtn { min-height: 44px; border: 0; background: transparent; color: var(--leaf); font: 600 14px Figtree, sans-serif; text-decoration: underline; cursor: pointer; }
+  #copyStatus { margin: 0; color: var(--muted); font-size: 13px; white-space: pre-wrap; }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Practice</h1>
-  <p class="lede">Learn to write a phrase in Baybayin: watch it, trace it, then write it from memory.</p>
+<div class="page prac">
+  <div class="bar">
+    <a href="index.html?view=phone" aria-label="Sulat home"><img src="img/wordmark-green.png" alt="Sulat"></a>
+    <button type="button" class="iconbtn" id="sound" aria-pressed="false" aria-label="Sound on. Tap to turn off"><svg class="on" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"></path><path d="M16.5 8.5a5 5 0 0 1 0 7"></path><path d="M19 6a8.5 8.5 0 0 1 0 12"></path></svg><svg class="off" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"></path><path d="M17 9l5 6M22 9l-5 6"></path></svg></button>
+  </div>
 
-  <section class="card" id="introCard">
-    <div class="row" id="phrases"></div>
-    <div id="phraseView" style="margin-top:14px"></div>
-    <p id="phraseLine"></p>
-    <ol id="sylList"></ol>
-    <label class="field" for="learner">Learner (optional, for your notes)</label>
-    <input id="learner" type="text" autocomplete="off" placeholder="Name or initials">
-    <p id="howTitle">How the lesson works</p>
-    <ol id="howItWorks">
-      <li><b>Watch</b> each syllable being written.</li>
-      <li><b>Trace</b> it over the guide.</li>
-      <li><b>Write the whole phrase from memory</b>, with no guide. Tap Peek if you get stuck.</li>
-    </ol>
-    <p id="howTip">Tip: while you trace, try to remember each shape. You’ll write them on your own at the end.</p>
-    <div class="row" style="margin-top:14px">
-      <button id="startBtn" type="button" class="primary">Start the lesson</button>
+  <section id="introCard">
+    <div class="backrow"><a class="backbtn" href="index.html?view=phone"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>Back</a></div>
+    <div class="marina">
+      <img src="img/marina.webp" alt="Marina">
+      <div class="bubble">
+        <p class="hi">Learn it with me!</p>
+        <p class="say" style="white-space: nowrap">Watch, trace, then write it.</p>
+      </div>
     </div>
-    <p id="introStatus" role="status" style="color:var(--quiet)"></p>
-    <p id="scorerStamp" style="color:var(--quiet);font-size:13px;margin:6px 0 0"></p>
+    <div id="phrases"></div>
+    <div class="panel bamboo">
+      <div id="phraseView"></div>
+      <p id="phraseLine"></p>
+    </div>
+    <div class="steps3"><div><span>1</span>Watch</div><div><span>2</span>Trace</div><div><span>3</span>From memory</div></div>
+    <p class="peekhint">Stuck on the last step? Tap Peek.</p>
+    <input id="learner" type="hidden" value="">
+    <ol id="sylList" hidden></ol>
+    <button id="startBtn" type="button" class="bigbtn">Start the lesson</button>
+    <p id="introStatus" role="status"></p>
+    <p id="scorerStamp"></p>
   </section>
 
-  <section class="card" id="lessonCard" hidden>
-    <div class="row between">
+  <section id="lessonCard" hidden>
+    <div class="backrow">
+      <button type="button" class="backbtn" id="backBtn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>Back</button>
       <span id="where"></span>
+    </div>
+    <div id="progress" aria-label="Lesson progress"></div>
+    <div class="labelrow">
+      <div id="cue">
+        <span id="cueBig"></span>
+        <span id="cueSmall"></span>
+      </div>
       <span id="phaseName"></span>
     </div>
-    <div id="cue">
-      <div id="cueBig"></div>
-      <div id="cueSmall"></div>
+    <div class="marina">
+      <img src="img/marina.webp" alt="Marina">
+      <div class="bubble">
+        <p class="hi" id="bubbleHead"></p>
+        <p class="say" id="feedback" role="status" aria-live="polite"></p>
+        <p class="say2" id="tip"></p>
+      </div>
     </div>
     <div class="stagebox">
       <canvas id="pad" aria-label="Writing area"></canvas>
       <div id="show"></div>
     </div>
-    <p id="feedback" role="status" aria-live="polite"></p>
-    <p id="tip"></p>
-    <div class="row" id="actions"></div>
+    <div id="actions"></div>
   </section>
 
-  <section class="card" id="doneCard" hidden>
-    <h2 id="doneTitle"></h2>
-    <p id="summary"></p>
-    <table>
-      <thead><tr><th>Syllable</th><th>Tracing</th><th>From memory</th></tr></thead>
-      <tbody id="results"></tbody>
-    </table>
-    <div class="row">
-      <button id="again" type="button" class="primary">Practice again</button>
-      <button id="copy" type="button">Copy results</button>
-      <button id="other" type="button">Choose another phrase</button>
+  <section id="doneCard" hidden>
+    <div class="backrow"><button type="button" class="backbtn" id="backDone"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>Back</button></div>
+    <div class="marina">
+      <img src="img/marina.webp" alt="Marina" style="width: 96px">
+      <div class="bubble">
+        <p class="hi good" id="doneHead" style="font-size: 36px"></p>
+        <p class="say" id="doneTitle"></p>
+      </div>
     </div>
-    <p id="copyStatus" role="status" style="color:var(--quiet)"></p>
+    <div id="tiles"></div>
+    <p id="summary"></p>
+    <div class="nextcard bamboo">
+      <div class="t"><img src="img/sampaguita.webp" alt=""><span>Now try it with a real pen.</span></div>
+      <a class="bigbtn" id="paperBtn" href="paper.html" style="min-height: 56px; font-size: 17px">Write it on paper</a>
+    </div>
+    <div class="twin">
+      <button id="again" type="button">Practice again</button>
+      <button id="other" type="button">Another phrase</button>
+    </div>
+    <details class="panel">
+      <summary>Details</summary>
+      <table>
+        <thead><tr><th>Syllable</th><th>Tracing</th><th>From memory</th></tr></thead>
+        <tbody id="results"></tbody>
+      </table>
+    </details>
+    <button id="copy" type="button" class="linkbtn">Copy results</button>
+    <p id="copyStatus" role="status"></p>
   </section>
 </div>
 
@@ -176,6 +192,7 @@
   // Sound never blocks the lesson: a failed play is silently ignored.
   var AUDIO_PHRASES = { 'mahal kita': 1, salamat: 1, kumusta: 1, 'magandang umaga': 1, paalam: 1 };
   function playAudio(name) {
+    try { if (window.localStorage.getItem('sulat.sound') === 'off') { return; } } catch (e) { /* storage unavailable: sound stays on */ }
     try {
       var p = new Audio('audio/' + name + '.mp3').play();
       if (p && p.catch) { p.catch(function () { /* no sound: keep going */ }); }
@@ -344,7 +361,7 @@
           // a short arrow showing which way the stroke starts
           var q = pointAlong(s.pts, 80);
           var ang = Math.atan2(q.y - p.y, q.x - p.x);
-          ctx.strokeStyle = 'rgba(31,58,138,0.9)';
+          ctx.strokeStyle = 'rgba(47,90,54,0.95)';
           ctx.lineWidth = 7;
           ctx.lineCap = 'round';
           ctx.beginPath();
@@ -360,7 +377,7 @@
           mx -= 44;
         }
         placed.push({ x: mx, y: my });
-        ctx.fillStyle = 'rgba(31,58,138,0.95)';
+        ctx.fillStyle = 'rgba(47,90,54,0.96)';
         ctx.beginPath(); ctx.arc(mx, my, 21, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 24px -apple-system, Helvetica, Arial, sans-serif';
@@ -384,8 +401,8 @@
 
   function drawUser() {
     withGlyphSpace(function () {
-      ctx.strokeStyle = '#14161a';
-      ctx.fillStyle = '#14161a';
+      ctx.strokeStyle = '#1E2A1F';
+      ctx.fillStyle = '#1E2A1F';
       ctx.lineWidth = INK;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
@@ -400,10 +417,10 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, size, size);
     if (!cur) { return; }
-    if (st.phase === 'trace') { drawRef('#d3d8df'); drawMarkers(); }
-    if (peeking && st.phase === 'try') { drawRef('rgba(31,58,138,0.28)'); }
+    if (st.phase === 'trace') { drawRef('#CBD5BE'); drawMarkers(); }
+    if (peeking && st.phase === 'try') { drawRef('#CBD5BE'); }
     drawUser();
-    if (ghost) { drawRef('rgba(31,58,138,0.38)', ghost); }
+    if (ghost) { drawRef('rgba(47,90,54,0.34)', ghost); }
   }
 
   /* ---------- pointer input ---------- */
@@ -473,16 +490,54 @@
     });
   }
 
-  function say(text, kind, tip) {
+  var RETRY_ISSUES = { lookalike: 1, count: 1, missing: 1, shape: 1 };
+  function say(text, kind, tip, issue) {
     var f = $('feedback');
     f.textContent = text || '';
-    f.className = kind || '';
     $('tip').textContent = tip || '';
+    var h = $('bubbleHead'), word, cls = '';
+    if (kind === 'good') { word = 'Magaling!'; cls = 'good'; }
+    else if (kind === 'bad') {
+      if (issue === 'empty') { word = 'Draw it first!'; cls = 'almost'; }
+      else if (RETRY_ISSUES[issue]) { word = 'Try again'; cls = 'retry'; }
+      else { word = 'Almost!'; cls = 'almost'; }
+    }
+    else if (st.phase === 'show') { word = 'Watch me write it!'; }
+    else if (st.phase === 'trace') { word = 'Trace over the guide!'; }
+    else if (st.phase === 'tryIntro') { word = 'Now without the guide!'; }
+    else { word = 'Now you write it!'; }
+    h.textContent = word;
+    h.className = 'hi ' + cls;
+  }
+
+  // The five-segment progress bar replaces "Syllable n of N".
+  function renderProgress() {
+    var host = $('progress');
+    var n = st.tokens.length;
+    host.style.gridTemplateColumns = 'repeat(' + n + ', minmax(0, 1fr))';
+    host.innerHTML = '';
+    st.tokens.forEach(function (t, k) {
+      var r = st.results[k] || {};
+      var done, cur;
+      if (st.phase === 'tryIntro') { done = false; cur = false; }
+      else {
+        var passed = st.phase === 'try' ? r.tryPassed : r.tracePassed;
+        done = !!passed || k < st.idx;
+        cur = !done && k === st.idx;
+      }
+      var cell = document.createElement('div');
+      cell.className = done ? 'done' : (cur ? 'cur' : '');
+      cell.innerHTML = '<span class="bar5"></span><span class="t"></span>';
+      cell.lastChild.textContent = t.text;
+      host.appendChild(cell);
+    });
   }
 
   function header(phaseName) {
-    $('where').textContent = 'Syllable ' + (st.idx + 1) + ' of ' + st.tokens.length;
+    $('where').textContent = st.text;
     $('phaseName').textContent = phaseName;
+    $('phaseName').className = phaseName === 'From memory' ? 'mem' : '';
+    renderProgress();
   }
 
   function showSvg(on) { $('show').hidden = !on; }
@@ -492,9 +547,9 @@
     cur = buildSyllable(st.tokens[st.idx]);
     computeMap();
     user = []; drawing = null; checked = false; ghost = null;
-    header('Show me');
+    header('Watch');
     $('cueBig').textContent = cur.tok.text;
-    $('cueSmall').textContent = Sulat.describe(cur.tok);
+    $('cueSmall').textContent = Sulat.describe(cur.tok).replace(/^[^:]*:\s*/, '');
     showSvg(true);
     redraw();
     ctrl = Sulat.render($('show'), pack, cur.lay, { ink: INK, dotInk: 34, ariaLabel: cur.tok.text + ' in Baybayin' });
@@ -513,7 +568,7 @@
     header('Trace');
     showSvg(false);
     redraw();
-    say('Trace over the guide. Follow the numbers and arrows.');
+    say('Follow the numbers and arrows.');
     drawActions();
   }
 
@@ -559,7 +614,7 @@
     user = []; drawing = null; checked = false; ghost = null;
     stopPeek();
     redraw();
-    say(st.phase === 'try' ? 'Write “' + cur.tok.text + '” from memory.' : 'Trace over the guide. Follow the numbers and arrows.');
+    say(st.phase === 'try' ? 'Write “' + cur.tok.text + '” from memory.' : 'Follow the numbers and arrows.');
     drawActions();
   }
 
@@ -577,7 +632,7 @@
     Object.keys(cur.opts).forEach(function (k) { opts[k] = cur.opts[k]; });
     if (memory) { opts.alternatives = alternativesFor(cur); }
     var res = SulatScore.score(cur.strokes, user, opts);
-    if (res.issue === 'empty') { say(res.message, 'bad'); return; }
+    if (res.issue === 'empty') { say(res.message, 'bad', '', 'empty'); return; }
     checked = true;
     var r = st.results[st.idx];
     if (memory) {
@@ -595,7 +650,8 @@
     }
     r.log.push({ phase: st.phase, pass: res.pass, issue: res.issue, at: Date.now() });
     redraw();
-    say(res.message, res.pass ? 'good' : 'bad', res.pass ? (res.tip || '') : (memory ? 'The blue shows how it’s written.' : ''));
+    renderProgress();
+    say(res.message, res.pass ? 'good' : 'bad', res.pass ? (res.tip || '') : (memory ? 'The green shows how it’s written.' : ''), res.issue);
     var last = st.idx === st.tokens.length - 1;
     if (res.pass) {
       setActions(memory
@@ -621,10 +677,12 @@
     showSvg(false);
     redraw();
     $('where').textContent = st.text;
-    $('phaseName').textContent = 'You try';
+    $('phaseName').textContent = 'From memory';
+    $('phaseName').className = 'mem';
+    renderProgress();
     $('cueBig').textContent = 'From memory';
-    $('cueSmall').textContent = 'No guide this time. You’ll only see how each syllable sounds. Stuck? Tap Peek for a quick look.';
-    say('');
+    $('cueSmall').textContent = '';
+    say('No guide this time. Stuck? Tap Peek for a quick look.');
     setActions([{ label: 'Begin', primary: true, fn: function () { st.idx = 0; goTry(); } }]);
   }
 
@@ -634,7 +692,7 @@
     computeMap();
     user = []; drawing = null; checked = false; ghost = null;
     stopPeek();
-    header('You try');
+    header('From memory');
     $('cueBig').textContent = cur.tok.text;
     $('cueSmall').textContent = '';
     showSvg(false);
@@ -694,8 +752,26 @@
     $('doneCard').hidden = false;
     var n = st.results.length, first = firstTryCount();
     var all = st.results.every(function (r) { return r.tryPassed; });
+    $('doneHead').textContent = all ? 'Magaling!' : 'Nice work!';
     $('doneTitle').textContent = all ? 'You wrote “' + st.text + '” from memory!' : 'Lesson complete';
-    $('summary').textContent = 'Right on the first try from memory: ' + first + ' of ' + n + ' syllables.';
+    var got = st.results.filter(function (r) { return r.tryPassed; }).length;
+    $('summary').textContent = 'First try from memory: ' + first + ' of ' + n + ' · got there in the end: ' + got + ' of ' + n;
+    var tiles = $('tiles');
+    tiles.innerHTML = '';
+    var ICON = {
+      first: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2A7A3B" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="first try"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>',
+      later: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C0892A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="got there after a peek or retry"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>',
+      not: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6B6450" stroke-width="2.4" stroke-linecap="round" role="img" aria-label="not yet"><path d="M6 12h12"></path></svg>'
+    };
+    st.results.forEach(function (r) {
+      var tile = document.createElement('div');
+      tile.className = 'tile';
+      var b = document.createElement('b');
+      b.textContent = r.text;
+      tile.appendChild(b);
+      tile.insertAdjacentHTML('beforeend', r.tryFirst ? ICON.first : (r.tryPassed ? ICON.later : ICON.not));
+      tiles.appendChild(tile);
+    });
     var body = $('results');
     body.innerHTML = '';
     st.results.forEach(function (r) {
@@ -710,6 +786,31 @@
       all2.push({ text: st.text, learner: st.learner, at: new Date().toISOString(), results: st.results });
       localStorage.setItem(key, JSON.stringify(all2));
     } catch (e) { /* storage unavailable: the copy button still works */ }
+  }
+
+  function showIntro() {
+    if (ctrl) { ctrl.stop(); }
+    $('lessonCard').hidden = true;
+    $('doneCard').hidden = true;
+    $('introCard').hidden = false;
+    st.phase = 'intro';
+    renderIntro();
+  }
+  function goBack() {
+    if (st.phase === 'show' || st.phase === 'trace') {
+      if (st.idx > 0) { st.idx -= 1; goShow(); } else { showIntro(); }
+    } else if (st.phase === 'tryIntro') {
+      st.idx = st.tokens.length - 1; goShow();
+    } else if (st.phase === 'try') {
+      if (st.idx > 0) { st.idx -= 1; goTry(); } else { goTryIntro(); }
+    } else if (st.phase === 'done') {
+      $('doneCard').hidden = true;
+      $('lessonCard').hidden = false;
+      st.idx = st.tokens.length - 1;
+      resize();
+      goTry();
+      resize();
+    }
   }
 
   function startLesson() {
@@ -734,7 +835,7 @@
     st.tokens = [];
     words.forEach(function (w) { w.tokens.forEach(function (t) { st.tokens.push(t); }); });
     var lay = Sulat.layout(pack, words);
-    var c = Sulat.render($('phraseView'), pack, lay, { labels: true, ariaLabel: st.text + ' in Baybayin' });
+    var c = Sulat.render($('phraseView'), pack, lay, { labels: true, labelSize: Math.max(70, 15 * lay.viewBox[2] / ($('phraseView').clientWidth || 318)), ariaLabel: st.text + ' in Baybayin' });
     c.play({ speed: 1 });
     var en = englishFor(st.text);
     $('phraseLine').textContent = st.text + (en ? ' · ' + en : '');
@@ -764,13 +865,10 @@
   });
 
   $('startBtn').addEventListener('click', startLesson);
+  $('backBtn').addEventListener('click', goBack);
+  $('backDone').addEventListener('click', goBack);
   $('again').addEventListener('click', startLesson);
-  $('other').addEventListener('click', function () {
-    $('doneCard').hidden = true;
-    $('introCard').hidden = false;
-    st.phase = 'intro';
-    renderIntro();
-  });
+  $('other').addEventListener('click', showIntro);
   $('copy').addEventListener('click', function () {
     var text = resultsText();
     function done(ok) { $('copyStatus').textContent = ok ? 'Copied. Paste it into your notes.' : 'Copy failed. Here it is:\n' + text; }
@@ -804,6 +902,16 @@
     $('introStatus').textContent = 'Couldn’t load the stroke pack. Open this page from your Sulat site. (' + err.message + ')';
     $('startBtn').disabled = true;
   });
+})();
+</script>
+<script>
+(function () {
+  'use strict';
+  var btn = document.getElementById('sound');
+  function off() { try { return window.localStorage.getItem('sulat.sound') === 'off'; } catch (e) { return false; } }
+  function paint() { var o = off(); btn.setAttribute('aria-pressed', o ? 'true' : 'false'); btn.setAttribute('aria-label', o ? 'Sound off. Tap to turn on' : 'Sound on. Tap to turn off'); }
+  btn.addEventListener('click', function () { try { window.localStorage.setItem('sulat.sound', off() ? 'on' : 'off'); } catch (e) { /* private mode */ } paint(); });
+  paint();
 })();
 </script>
 </body>
