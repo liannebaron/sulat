@@ -93,7 +93,10 @@
   }
   #lensTop { display: flex; justify-content: space-between; align-items: center; min-height: 40px; }
   #lensLogo { height: 40px; width: auto; display: block; opacity: 0.92; }
-  #lensGloss { font-size: 20px; color: rgba(245,236,215,0.75); }
+  #lensGloss { font-size: 20px; white-space: nowrap; }
+  #lensPhrase { color: #FFFFFF; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+  #lensGloss .sep { margin: 0 10px; color: rgba(245,236,215,0.45); }
+  #lensMeaning { color: rgba(245,236,215,0.75); }
   #lensChips { display: flex; justify-content: center; align-items: center; gap: 6px; }
   .chip {
     height: 38px; min-width: 38px; padding: 0 8px; box-sizing: border-box; border-radius: 9px;
@@ -110,28 +113,27 @@
   #lensStage svg { display: block; width: 100%; height: 100%; max-height: 280px; color: #F5ECD7; }
   #lensStage .mark { color: #FF8E72; }
   #lensLabel { display: flex; align-items: baseline; gap: 16px; padding: 0 4px; }
-  #lensSyl { font-size: 48px; font-weight: 700; line-height: 1; flex: none; }
-  #lensNote { font-size: 22px; line-height: 1.3; color: rgba(245,236,215,0.88); text-wrap: balance; min-height: 1.3em; }
+  #lensSyl { font-size: 48px; font-weight: 700; line-height: 1; flex: none; color: #FFFFFF; }
+  #lensNote { font-size: 22px; line-height: 1.3; color: rgba(245,236,215,0.88); min-height: 1.3em; }
   #lensNote .hl { color: #FF8E72; font-weight: 600; }
-  #lensBottom { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; text-align: center; align-items: start; }
-  .key { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  #lensBottom { display: flex; justify-content: center; align-items: flex-start; gap: 12px; }
+  .key, #lensReplay { width: 96px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
   .key .cap, #lensReplay .cap {
-    height: 40px; min-width: 44px; padding: 0 8px; box-sizing: border-box; border-radius: 10px;
-    display: flex; align-items: center; justify-content: center; font-size: 22px;
-    border: 2px solid rgba(245,236,215,0.5);
+    width: 64px; height: 40px; box-sizing: border-box; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; color: #F5ECD7; border: 2px solid rgba(245,236,215,0.5);
+    transition: border-color 0.15s, color 0.15s, box-shadow 0.15s;
   }
-  .key .lbl, #lensReplay .lbl { font-size: 18px; color: rgba(245,236,215,0.8); white-space: nowrap; }
+  #lensReplay .cap { font-size: 17px; font-weight: 700; }
+  .key .lbl, #lensReplay .lbl { font-size: 18px; color: rgba(245,236,215,0.8); white-space: nowrap; transition: color 0.15s; }
   .key.off { visibility: hidden; }
-  /* The one real button: Enter (or Neural Band Select) always presses it. Gold = what Enter does. */
-  #lensReplay {
-    background: transparent; border: 0; padding: 0; margin: 0; font: inherit; cursor: pointer;
-    display: flex; flex-direction: column; align-items: center; gap: 6px; color: #F6C85C;
-  }
-  #lensReplay .cap { border: 4px solid #F6C85C; box-shadow: 0 0 0 3px rgba(246,200,92,0.28); color: #F6C85C; font-size: 17px; font-weight: 700; }
-  #lensReplay .lbl { color: #F6C85C; font-weight: 700; }
-  #lensReplay:focus { outline: none; }
-  #lensReplay:focus-visible .cap { box-shadow: 0 0 0 5px rgba(246,200,92,0.5); }
+  /* The one real button: Enter (or Neural Band Select) always presses it. */
+  #lensReplay { background: transparent; border: 0; padding: 0; margin: 0; font: inherit; cursor: pointer; }
+  #lensReplay:focus, #lensReplay:focus-visible { outline: none; }
   #lensReplay:disabled { opacity: 0.55; cursor: default; }
+  /* Gold flashes on the key you just pressed. */
+  .key.pressed .cap, #lensReplay.pressed .cap { border-color: #F6C85C; color: #F6C85C; box-shadow: 0 0 0 3px rgba(246,200,92,0.28); }
+  .key.pressed .lbl, #lensReplay.pressed .lbl { color: #F6C85C; }
   /* Each mode shows only what it needs. */
   #lens[data-mode="show"] #lensWord, #lens[data-mode="show"] #lensCount { display: none; }
   #lens:not([data-mode="show"]) #lensSyl { display: none; }
@@ -167,7 +169,7 @@
 <div id="lens" aria-live="polite" data-mode="show">
   <div id="lensTop">
     <img id="lensLogo" src="img/wordmark-cream.png" alt="Sulat">
-    <span id="lensGloss"></span>
+    <span id="lensGloss"><span id="lensPhrase"></span><span class="sep">|</span><span id="lensMeaning"></span></span>
   </div>
   <div id="lensChips" aria-label="Progress through the phrase"></div>
   <div id="lensWord"></div>
@@ -346,7 +348,9 @@
     $('lensWord').textContent = u.word;
     $('lensCount').textContent = (unitIndex + 1) + ' / ' + units.length;
     renderChips(units, unitIndex);
-    $('lensGloss').textContent = glossFor(input.value);
+    $('lensPhrase').textContent = String(input.value || '').trim();
+    $('lensMeaning').textContent = glossFor(input.value);
+    $('lensGloss').querySelector('.sep').hidden = !glossFor(input.value);
     $('lensSyl').textContent = u.tok.text;
     $('lensNote').innerHTML = noteHtml(u.tok);
     var lay = Sulat.layout(pack, [{ text: u.tok.text, tokens: [u.tok] }], { pad: 90 });
@@ -370,12 +374,20 @@
     show: { up: 'Phrases', down: 'Write it', left: 'Prev', right: 'Next' },
     try: { up: 'Show me', down: '', left: 'Watch again', right: 'Next' },
     checking: { up: '', down: '', left: 'Back', right: '' },
-    verdict: { up: '', down: '', left: 'Show me again', right: 'Next' }
+    verdict: { up: '', down: '', left: 'Watch again', right: 'Next' }
   };
   function setKey(id, label) {
     var k = $(id);
     k.classList.toggle('off', !label);
     k.querySelector('.lbl').textContent = label || '';
+  }
+  var KEY_IDS = { ArrowUp: 'keyUp', ArrowDown: 'keyDown', ArrowLeft: 'keyLeft', ArrowRight: 'keyRight', Enter: 'lensReplay', ' ': 'lensReplay' };
+  function flashKey(k) {
+    var el = KEY_IDS[k] ? $(KEY_IDS[k]) : null;
+    if (!el) { return; }
+    el.classList.add('pressed');
+    clearTimeout(el.__flash);
+    el.__flash = setTimeout(function () { el.classList.remove('pressed'); }, 320);
   }
   function setLensUI() {
     var b = $('lensReplay');
@@ -532,6 +544,7 @@
   // The Neural Band arrives as arrow keys and Enter.
   document.addEventListener('keydown', function (e) {
     if (e.target === input) { return; }
+    if (glasses) { flashKey(e.key); }
     if (glasses) {
       if (e.key === 'ArrowRight') { e.preventDefault(); unitIndex += 1; renderLensUnit(); }
       else if (e.key === 'ArrowLeft') {
