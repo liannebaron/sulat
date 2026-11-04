@@ -332,7 +332,12 @@
     });
   }
   function noteHtml(tok) {
-    var t = Sulat.describe(tok).replace(/^[^:]*:\s*/, '');
+    // Shorter wording for the lens so the note fits on one line (the phone keeps the full sentence).
+    var t = Sulat.describe(tok).replace(/^[^:]*:\s*/, '')
+      .replace(' (every letter already carries an a)', ' · every letter carries an a')
+      .replace(', which turns its a into i or e', ': a becomes i or e')
+      .replace(', which turns its a into u or o', ': a becomes u or o')
+      .replace(', which silences its a', ': silences the a');
     return escLensTip(t).replace(/(dot above|dot below|cross below)/, '<span class="hl">$1</span>');
   }
 
