@@ -8,68 +8,37 @@
   // Runs before anything is drawn, so the glasses never flash the light page layout.
   if (/[?&]view=glasses(&|$)/.test(window.location.search)) { document.documentElement.className += ' glasses'; }
 </script>
+<link rel="icon" href="img/favicon.png">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<link rel="stylesheet" href="phone.css">
 <style>
-  :root {
-    --page: #eceff3;
-    --card: #ffffff;
-    --ink: #14161a;
-    --quiet: #5d6572;
-    --line: #d9dde3;
-    --accent: #1f3a8a;
-  }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; }
-  body {
-    background: var(--page);
-    color: var(--ink);
-    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  }
-  .wrap {
-    max-width: 980px;
-    margin: 0 auto;
-    padding: 16px;
-    padding-left: max(16px, env(safe-area-inset-left));
-    padding-right: max(16px, env(safe-area-inset-right));
-  }
-  h1 { margin: 4px 0 2px; font: 400 30px Georgia, "Times New Roman", serif; }
-  .lede { margin: 0 0 16px; color: var(--quiet); }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
-  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-  input[type="text"] {
-    flex: 1 1 260px;
-    min-height: 48px;
-    padding: 0 14px;
-    font: inherit;
-    font-size: 18px;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-  }
-  button, .btn {
-    font: inherit;
-    min-height: 48px;
-    padding: 0 18px;
-    border-radius: 10px;
-    border: 1px solid var(--line);
-    background: #fff;
-    color: var(--ink);
-    cursor: pointer;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    touch-action: manipulation;
-  }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
-  button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--accent); border-color: var(--accent); }
-  button:focus-visible, input:focus-visible, .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-  .starters { margin-top: 12px; }
-  .starters button { min-height: 44px; }
-  .starters small { color: var(--quiet); margin-left: 6px; }
-  #stage svg { display: block; width: 100%; height: auto; max-height: 340px; color: var(--ink); }
-  #stage .label { fill: var(--quiet); font-family: -apple-system, Helvetica, Arial, sans-serif; }
-  #stage .label.active { fill: var(--accent); font-weight: 700; }
-  #syllables { margin: 12px 0 4px; font-size: 20px; letter-spacing: 0.02em; }
-  #breakdown { margin: 6px 0 0; padding-left: 20px; color: var(--quiet); }
-  #status { min-height: 1.4em; color: var(--quiet); margin: 8px 0 0; }
+  /* Phone Show me: cream paper, leaf green, Marina's note. Shared look lives in phone.css. */
+  .page.wrap { gap: 12px; }
+  .marina img { width: 84px; }
+  .bubble .hi { font-size: 28px; }
+  .bubble .say { white-space: nowrap; font-size: 15px; }
+  .back { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 16px 0 10px; border-radius: 999px; background: var(--cream); border: 1.5px solid var(--tan); color: var(--leaf); font: 600 15px Figtree, sans-serif; text-decoration: none; }
+  .starters { display: flex; flex-wrap: wrap; gap: 8px; }
+  .starters button { min-height: 44px; padding: 0 16px; border: 1.5px solid var(--tan); border-radius: 999px; background: var(--cream); color: var(--ink); font: 600 15px Figtree, sans-serif; white-space: nowrap; box-shadow: 0 3px 0 var(--tan); cursor: pointer; touch-action: manipulation; }
+  .starters button small { display: none; }
+  .starters button[aria-pressed="true"] { background: var(--leaf); border-color: var(--leaf); color: var(--cream); box-shadow: 0 3px 0 var(--leaf-dark); }
+  .typeit { display: flex; gap: 8px; }
+  .typeit input { flex: 1; min-width: 0; min-height: 48px; padding: 0 14px; font: 500 17px Figtree, sans-serif; color: var(--ink); background: #FFFFFF; border: 1.5px solid var(--tan); border-radius: 12px; }
+  .typeit button, .smallbtn { min-height: 48px; padding: 0 16px; border-radius: 12px; border: 1.5px solid var(--leaf); background: #FFFFFF; color: var(--leaf); font: 700 15px Figtree, sans-serif; white-space: nowrap; cursor: pointer; touch-action: manipulation; }
+  .typeit button.go { background: var(--leaf); color: var(--cream); box-shadow: 0 3px 0 var(--leaf-dark); }
+  .smallbtn[aria-pressed="true"] { background: var(--sage); border-color: var(--leaf); }
+  .panel { padding: 14px 16px; background-color: var(--cream); border: 1.5px solid var(--tan); border-radius: 18px; box-shadow: 0 3px 0 var(--tan), 0 12px 20px -14px rgba(91,70,30,0.45); }
+  #phraseTitle { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+  #phraseTitle span { font-weight: 500; color: var(--muted); }
+  #stage svg { display: block; width: 100%; height: auto; max-height: 320px; color: var(--ink); }
+  #stage .label { fill: var(--muted); font-family: Figtree, system-ui, sans-serif; }
+  #stage .label.active { fill: var(--leaf); font-weight: 700; }
+  .controls { display: flex; gap: 8px; margin-top: 10px; }
+  #syllables { position: absolute; left: -9999px; }
+  .panel h2 { margin: 0 0 6px; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  #breakdown { margin: 0; padding-left: 20px; color: var(--quiet); font-size: 15px; line-height: 1.45; }
+  #status { min-height: 1.4em; color: var(--muted); margin: 0; font-size: 14px; }
+  .actions { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
 
   /* Glasses view: 600x600, black is see-through on the Display. Lines, not fills.
      Fonts are local files so Show me never needs the network beyond the pack. */
@@ -190,30 +159,48 @@
 </style>
 </head>
 <body>
-<div class="wrap">
-  <p style="margin:0 0 4px"><a href="index.html?view=phone">&larr; Sulat home</a></p>
-  <h1>Show me</h1>
-  <p class="lede">Type a word or phrase in Tagalog and watch it written in Baybayin, stroke by stroke, in the order the strokes are drawn.</p>
-
-  <div class="card">
-    <div class="row">
-      <label for="phrase" style="position:absolute;left:-9999px">Phrase</label>
-      <input id="phrase" type="text" value="mahal kita" autocomplete="off" autocapitalize="off" spellcheck="false">
-      <button id="go" type="button" class="primary">Show me</button>
-      <button id="replay" type="button">Replay</button>
-    </div>
-    <div class="row starters" id="starters"></div>
+<div class="page wrap">
+  <div class="bar">
+    <a class="back" href="index.html?view=phone"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>Home</a>
+    <button type="button" class="iconbtn" id="sound" aria-pressed="false" aria-label="Sound on. Tap to turn off"><svg class="on" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"></path><path d="M16.5 8.5a5 5 0 0 1 0 7"></path><path d="M19 6a8.5 8.5 0 0 1 0 12"></path></svg><svg class="off" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"></path><path d="M17 9l5 6M22 9l-5 6"></path></svg></button>
   </div>
 
-  <div class="card">
+  <div class="marina">
+    <img src="img/marina.webp" alt="Marina">
+    <div class="bubble">
+      <p class="hi">Watch it written!</p>
+      <p class="say">Tap a phrase, or type one.</p>
+    </div>
+  </div>
+
+  <div class="starters" id="starters"></div>
+
+  <div class="typeit">
+    <label for="phrase" style="position:absolute;left:-9999px">Phrase</label>
+    <input id="phrase" type="text" value="mahal kita" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <button id="go" type="button" class="go">Show me</button>
+  </div>
+
+  <div class="panel bamboo">
+    <div id="phraseTitle"></div>
     <div id="stage" aria-live="polite"></div>
     <p id="syllables"></p>
-    <ul id="breakdown"></ul>
-    <div class="row" style="margin-top:12px">
-      <button id="slow" type="button" aria-pressed="false">Slow</button>
-      <a id="lensLink" class="btn" href="#">Open glasses view</a>
+    <div class="controls">
+      <button id="replay" type="button" class="smallbtn">Replay</button>
+      <button id="slow" type="button" class="smallbtn" aria-pressed="false">Slow</button>
     </div>
-    <p id="status" role="status"></p>
+  </div>
+
+  <div class="panel">
+    <h2>Letter by letter</h2>
+    <ul id="breakdown"></ul>
+  </div>
+
+  <p id="status" role="status"></p>
+
+  <div class="actions">
+    <a id="practiceLink" class="btn" href="practice.html">Practice this</a>
+    <a id="lensLink" class="btn quiet" href="#">Open glasses view</a>
   </div>
 </div>
 
@@ -337,7 +324,16 @@
     };
   }
 
+  function markStarters() {
+    var key = String(input.value || '').toLowerCase().trim().replace(/\s+/g, ' ');
+    Array.prototype.forEach.call($('starters').children, function (b) {
+      b.setAttribute('aria-pressed', b.firstChild && b.firstChild.nodeValue === key ? 'true' : 'false');
+    });
+  }
   function updateLensLink() {
+    var pl = $('practiceLink');
+    if (pl) { pl.href = 'practice.html?text=' + encodeURIComponent(input.value); }
+    markStarters();
     var q = new URLSearchParams({ view: 'glasses', text: input.value });
     if (speed < 1) { q.set('speed', 'slow'); }
     $('lensLink').href = '?' + q.toString();
@@ -347,6 +343,8 @@
     if (!pack) { return; }
     words = Sulat.syllabify(input.value);
     updateLensLink();
+    var g = glossFor(input.value);
+    $('phraseTitle').innerHTML = escLensTip(String(input.value).trim()) + (g ? ' <span>· ' + escLensTip(g) + '</span>' : '');
     if (!words.length) { $('stage').innerHTML = ''; $('syllables').textContent = ''; $('breakdown').innerHTML = ''; return; }
     var lay = Sulat.layout(pack, words);
     var c = null;
@@ -702,6 +700,16 @@
     var msg = 'Couldn’t load packs/baybayin.json. Open this page from your Sulat site, not as a local file. (' + err.message + ')';
     if (glasses) { $('lensWord').textContent = msg; } else { status(msg); }
   });
+})();
+</script>
+<script>
+(function () {
+  'use strict';
+  var btn = document.getElementById('sound');
+  function off() { try { return window.localStorage.getItem('sulat.sound') === 'off'; } catch (e) { return false; } }
+  function paint() { var o = off(); btn.setAttribute('aria-pressed', o ? 'true' : 'false'); btn.setAttribute('aria-label', o ? 'Sound off. Tap to turn on' : 'Sound on. Tap to turn off'); }
+  btn.addEventListener('click', function () { try { window.localStorage.setItem('sulat.sound', off() ? 'on' : 'off'); } catch (e) { /* private mode */ } paint(); });
+  paint();
 })();
 </script>
 </body>
