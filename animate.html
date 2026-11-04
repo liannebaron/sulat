@@ -201,7 +201,6 @@
 
   <div class="actions">
     <a id="practiceLink" class="btn" href="practice.html">Practice this</a>
-    <a id="lensLink" class="btn quiet" href="#">Open glasses view</a>
   </div>
 </div>
 
@@ -337,7 +336,8 @@
     markStarters();
     var q = new URLSearchParams({ view: 'glasses', text: input.value });
     if (speed < 1) { q.set('speed', 'slow'); }
-    $('lensLink').href = '?' + q.toString();
+    var ll = $('lensLink');
+    if (ll) { ll.href = '?' + q.toString(); }
   }
 
   function renderPhrase() {
