@@ -6,7 +6,7 @@ A handwriting tutor for scripts the world stopped teaching. It launches with Bay
 
 Built solo by Lianne Baron for the Meta Global AI Developer Hackathon, Indie track, theme "Build for Your World."
 
-**Live app:** [sulat-7sw.pages.dev](https://sulat-7sw.pages.dev) &nbsp;|&nbsp; **Demo video:** [add link here]
+**Live app:** [sulat-7sw.pages.dev](https://sulat-7sw.pages.dev)
 
 ## Why I'm building this
 
@@ -18,7 +18,7 @@ I'm not the only one. Baybayin is having a revival, especially among second-gene
 
 ## Meet Marina
 
-Marina is the tutor. She is named for my Lola, who taught at her local school in Pampanga for more than 30 years. The word she left with me, and that I heard in my head every day while building this, is *determination*. Her look comes from Mariang Sinukuan, the generous protector of nature in Kapampangan folklore, who gifts villagers with fruit, vegetables and forest bounty. She wears sampaguita, the Philippine national flower, in her hair, and she is styled as paper cut on bamboo paper. Baybayin was originally scribed on bamboo, this is a nod to its' history. Future versions will bring in more of Mariang Sinukuan's fruit.
+Marina is the tutor. She is named for my Lola, who taught at her local school in Pampanga for more than 30 years. The word she left with me, and that I heard in my head every day while building this, is *determination*. Her look comes from Mariang Sinukuan, the generous protector of nature in Kapampangan folklore, who gifts villagers with fruit, vegetables and forest bounty. She wears sampaguita, the Philippine national flower, in her hair, and she is styled as paper cut on bamboo paper. Baybayin was originally scribed on bamboo, this is a nod to its history. Future versions will bring in more of Mariang Sinukuan's fruit.
 
 ## How it works
 
@@ -163,7 +163,7 @@ What changed in the design: Spark is never asked which glyph it's looking at. Th
 ## Assets and credits
 
 - **Wordmark and glyphs:** hand-lettered and hand-drawn by me. The glyphs were reviewed by Baybayin calligrapher Taipan Lucero.
-- **Marina and the sampaguita artwork:** AI-generated. I sketched the idea of the character and described the style (paper cut, on bamboo paper, with sampaguita), and an AI image tool rendered options from my sketch. I chose one and cleaned it up for the app. <!-- TODO: name the image tool here. -->
+- **Marina and the sampaguita artwork:** AI-generated. I sketched the idea of the character and described the style (paper cut, on bamboo paper, with sampaguita), and an AI image tool rendered options from my sketch. I chose one and cleaned it up for the app.
 - **Audio:** the six phrase clips (`audio/`) were recorded by my mother.
 - **Fonts:** [Figtree](https://github.com/erikdkennedy/figtree) and [Caveat](https://github.com/googlefonts/caveat), both under the SIL Open Font License 1.1. Their licences are in `fonts/`.
 - **Glyph review:** Taipan Lucero, CalligraFilipino.
